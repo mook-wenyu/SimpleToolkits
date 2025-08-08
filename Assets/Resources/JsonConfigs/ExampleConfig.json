@@ -1,0 +1,39 @@
+﻿{
+  "$type": "System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[SimpleToolkits.BaseConfig, SimpleToolkits]], mscorlib",
+  "1001": {
+    "$type": "ExampleConfig, Assembly-CSharp",
+    "name": "名字1",
+    "hp": 0,
+    "die": true,
+    "pos": [
+      1.0
+    ],
+    "target": [
+      5.0,
+      -6.0
+    ],
+    "duiyou": [],
+    "id": "1001"
+  },
+  "1002": {
+    "$type": "ExampleConfig, Assembly-CSharp",
+    "name": "名字2",
+    "hp": 100,
+    "die": false,
+    "pos": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "target": [
+      -2.0,
+      2.0
+    ],
+    "duiyou": [
+      "文本",
+      "冒号:引号文本",
+      "引号文本2,有逗号"
+    ],
+    "id": "1002"
+  }
+}

@@ -1,0 +1,11 @@
+{
+    "FileVersion": "1.0.0",
+    "PackageName": "DefaultPackage",
+    "PackageVersion": "2025-08-09-1317",
+    "Wrappers": [
+        {
+            "BundleGUID": "f0a84026ba14fc63ec4caf653bb34c19",
+            "FileName": "f0a84026ba14fc63ec4caf653bb34c19.bundle"
+        }
+    ]
+}

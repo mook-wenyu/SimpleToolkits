@@ -1,6 +1,4 @@
-﻿using SimpleToolkits;
-
-public class ExampleConfig : BaseConfig
+﻿public class ExampleConfig : BaseConfig
 {
     /// <summary>
     /// 名字

@@ -1,5 +1,5 @@
 ﻿{
-  "$type": "System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[SimpleToolkits.BaseConfig, SimpleToolkits]], mscorlib",
+  "$type": "System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[BaseConfig, Assembly-CSharp]], mscorlib",
   "1001": {
     "$type": "ExampleConfig, Assembly-CSharp",
     "name": "名字1",

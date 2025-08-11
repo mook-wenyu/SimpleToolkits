@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,9 +15,18 @@ public class Test : MonoBehaviour
     {
         ConfigMgr.Init();
         ResMgr.Instance.OnSingletonInit();
+        ResMgr.Instance.InitPackageAsync(Constants.DefaultPackageName, string.Empty, string.Empty).Forget();
         
-        //var config = ConfigMgr.Get<ExampleConfig>("1001");
-        //Debug.Log(config.name);
+        var configs = ConfigMgr.GetAll<ExampleConfig>();
+        StringBuilder sb = new (configs.Count);
+        foreach (var c in configs)
+        {
+            sb.AppendJoin(",", c.id, c.name, c.hp, c.die, c.pos, c.target);
+            sb.AppendLine();
+            sb.AppendJoin(",", c.duiyou);
+            sb.AppendLine();
+        }
+        Debug.Log(sb.ToString());
         
         img = GameObject.Find("Image").GetComponent<Image>();
         Init().Forget();

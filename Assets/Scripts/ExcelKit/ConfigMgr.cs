@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Scripting;
@@ -20,22 +21,26 @@ public static class ConfigMgr
     /// </summary>
     public static void Init()
     {
-        string jsonPath = GetJsonPath();
-        LoadAllFromResources(jsonPath);
-    }
-
-    /// <summary>
-    /// 获取 json 文件的路径
-    /// </summary>
-    /// <returns></returns>
-    public static string GetJsonPath()
-    {
+        var isResources = false;
+        var jsonPath = "JsonConfigs";
         var excelSettings = Resources.Load<ExcelExporterSettings>("ExcelExporterSettings");
+        if (excelSettings != null)
+        {
+            isResources = excelSettings.jsonRelativePath.StartsWith("Resources/");
+            if (isResources)
+            {
+                jsonPath = excelSettings.jsonRelativePath["Resources/".Length..];
+            }
+        }
 
-        if (excelSettings == null) return "JsonConfigs";
-
-        return excelSettings.jsonRelativePath.StartsWith("Resources/") ?
-            excelSettings.jsonRelativePath["Resources/".Length..] : "JsonConfigs";
+        if (isResources)
+        {
+            LoadAllFromResources(jsonPath);
+        }
+        else
+        {
+            LoadAllFromAssetBundleAsync(jsonPath).Forget();
+        }
     }
 
     /// <summary>
@@ -47,7 +52,18 @@ public static class ConfigMgr
         var jsonConfigs = Resources.LoadAll<TextAsset>(jsonPath);
         foreach (var jsonConfig in jsonConfigs)
         {
-            var config = JsonConvert.DeserializeObject<Dictionary<string, BaseConfig>>(jsonConfig.text, _jsonSerializerSettings);
+            var config = JsonConvert.DeserializeObject<IReadOnlyDictionary<string, BaseConfig>>(jsonConfig.text, _jsonSerializerSettings);
+            _jsonData[jsonConfig.name] = config;
+        }
+    }
+
+    public static async UniTaskVoid LoadAllFromAssetBundleAsync(string jsonPath)
+    {
+        var assetInfos = ResMgr.Instance.GetAssetInfos(jsonPath);
+        foreach (var assetInfo in assetInfos)
+        {
+            var jsonConfig = await ResMgr.Instance.LoadAssetAsync<TextAsset>(assetInfo.AssetPath);
+            var config = JsonConvert.DeserializeObject<IReadOnlyDictionary<string, BaseConfig>>(jsonConfig.text, _jsonSerializerSettings);
             _jsonData[jsonConfig.name] = config;
         }
     }

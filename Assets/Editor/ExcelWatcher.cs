@@ -66,7 +66,7 @@ public static class ExcelWatcher
         if (_dirty)
         {
             _dirty = false;
-            ExcelEditor.GenerateConfigs();
+            EditorUtils.GenerateConfigs();
         }
     }
 }

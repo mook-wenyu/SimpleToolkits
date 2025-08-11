@@ -12,10 +12,23 @@ public class ExcelExporterSettings : ScriptableObject
 
     [Tooltip("生成 .json 文件的相对路径（基于 Assets）")]
     public string jsonRelativePath = "Resources/JsonConfigs";
+    
+    [Tooltip("使用 YooAsset 需要将该分组 Asset Tags 改为 JsonConfigs")]
+    public bool useYooAsset = false;
 
     public string ExcelFullPath => Path.Combine(Application.dataPath, "ExcelConfigs");
+    /// <summary>
+    /// C# 脚本路径
+    /// </summary>
     public string CsFullPath => Path.Combine(Application.dataPath, csRelativePath);
+    /// <summary>
+    /// Json 路径
+    /// </summary>
     public string JsonFullPath => Path.Combine(Application.dataPath, jsonRelativePath);
+    /// <summary>
+    /// 使用 YooAsset
+    /// </summary>
+    public bool UseYooAsset => useYooAsset;
 
     #if UNITY_EDITOR
     /* ---------- 单例访问 ---------- */

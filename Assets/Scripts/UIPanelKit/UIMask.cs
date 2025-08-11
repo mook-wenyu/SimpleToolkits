@@ -8,15 +8,6 @@ using UnityEngine.UI;
 public class UIMask : UIPanelBase
 {
     /// <summary>
-    /// 遮罩初始化
-    /// </summary>
-    public override void Init(UIMgr uiMgr)
-    {
-        base.Init(uiMgr);
-        // 遮罩不需要特殊的初始化逻辑
-    }
-
-    /// <summary>
     /// 销毁遮罩
     /// </summary>
     public override void DestroyPanel()

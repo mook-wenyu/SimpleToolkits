@@ -58,12 +58,10 @@ public abstract class UIPanelBase : MonoBehaviour
     /// 隐藏面板
     /// </summary>
     /// <param name="destroy">是否强制销毁面板</param>
-    /// <param name="usePool">是否使用对象池回收</param>
-    /// <param name="animType">关闭动画类型</param>
-    public virtual void Hide(bool destroy = false, bool usePool = false, UIPanelAnimType animType = UIPanelAnimType.None)
+    public virtual void Hide(bool destroy = false)
     {
         // 通过UI管理器处理面板关闭
-        uiMgr.ClosePanel(this, destroy, usePool, animType).Forget();
+        uiMgr.ClosePanel(this, destroy).Forget();
     }
 
     /// <summary>

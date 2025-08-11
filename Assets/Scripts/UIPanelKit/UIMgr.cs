@@ -49,7 +49,7 @@ public class UIMgr : MonoSingleton<UIMgr>
     {
         InitializeCanvas();
         InitLayers();
-        InitMaskPrefab();
+        InitMaskPrefabAsync().Forget();
     }
 
     /// <summary>
@@ -131,40 +131,40 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// <summary>
     /// 初始化遮罩预制体
     /// </summary>
-    private void InitMaskPrefab()
+    private async UniTask InitMaskPrefabAsync()
     {
         const string maskPrefabPath = "Prefabs/UI/UIMask";
 
-        // 检查是否已经缓存
-        if (_uiPrefabCache.ContainsKey(maskPrefabPath))
+        // 尝试使用LoadAndCachePrefab方法加载遮罩预制体
+        var maskPrefab = await LoadAndCachePrefab(maskPrefabPath);
+
+        // 如果无法从Resources加载，则动态创建遮罩预制体
+        if (maskPrefab == null)
         {
-            return;
+            Debug.Log("未找到UIMask预制体文件，动态创建遮罩预制体");
+
+            // 创建遮罩预制体
+            maskPrefab = new GameObject("UIMask");
+            maskPrefab.SetActive(false);
+
+            var rect = maskPrefab.AddComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            var image = maskPrefab.AddComponent<Image>();
+            image.color = new Color(0, 0, 0, 0.5f);
+
+            var button = maskPrefab.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+
+            // 添加UIMask组件用于对象池标识
+            maskPrefab.AddComponent<UIMask>();
+
+            // 缓存遮罩预制体
+            _uiPrefabCache[maskPrefabPath] = maskPrefab;
         }
-
-        // 创建遮罩预制体
-        var maskPrefab = new GameObject("UIMask");
-        maskPrefab.SetActive(false);
-
-        // 设置DontDestroyOnLoad，确保场景切换时不被销毁
-        DontDestroyOnLoad(maskPrefab);
-
-        var rect = maskPrefab.AddComponent<RectTransform>();
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-
-        var image = maskPrefab.AddComponent<Image>();
-        image.color = new Color(0, 0, 0, 0.5f);
-
-        var button = maskPrefab.AddComponent<Button>();
-        button.transition = Selectable.Transition.None;
-
-        // 添加UIMask组件用于对象池标识
-        maskPrefab.AddComponent<UIMask>();
-
-        // 缓存遮罩预制体
-        _uiPrefabCache[maskPrefabPath] = maskPrefab;
 
         // 创建遮罩对象池
         GetOrCreatePool<UIMask>(maskPrefab);
@@ -212,21 +212,8 @@ public class UIMgr : MonoSingleton<UIMgr>
         // 存储面板配置
         _panelConfigs[panelName] = panelInfo;
 
-        // 加载预制体
-        GameObject prefab = null;
-        if (_uiPrefabCache.TryGetValue(prefabPath, out prefab))
-        {
-            // 使用缓存
-        }
-        else
-        {
-            prefab = await LoadUIPrefab(prefabPath);
-            if (prefab != null)
-            {
-                _uiPrefabCache[prefabPath] = prefab;
-            }
-        }
-
+        // 加载并缓存预制体
+        var prefab = await LoadAndCachePrefab(prefabPath);
         if (prefab == null)
         {
             Debug.LogError($"预注册面板失败，无法加载预制体: {prefabPath}");
@@ -398,6 +385,8 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// <summary>
     /// 关闭UI面板
     /// </summary>
+    /// <typeparam name="T">面板类型</typeparam>
+    /// <param name="destroy">是否强制销毁面板，默认false（回收到对象池）</param>
     public async UniTask ClosePanel<T>(bool destroy = false) where T : UIPanelBase
     {
         string panelName = typeof(T).Name;
@@ -415,19 +404,26 @@ public class UIMgr : MonoSingleton<UIMgr>
 
         if (targetPanel != null)
         {
-            await ClosePanel(targetPanel, destroy);
+            await ClosePanelInternal(targetPanel, destroy);
         }
     }
 
     /// <summary>
-    /// 关闭UI面板
+    /// 关闭指定的UI面板实例
     /// </summary>
     /// <param name="panel">要关闭的面板</param>
-    /// <param name="destroy">是否强制销毁</param>
-    /// <param name="usePool">是否使用对象池回收</param>
-    /// <param name="animType">关闭动画类型</param>
-    public async UniTask ClosePanel(UIPanelBase panel, bool destroy = false, bool usePool = false,
-        UIPanelAnimType animType = UIPanelAnimType.None)
+    /// <param name="destroy">是否强制销毁面板，默认false（回收到对象池）</param>
+    public async UniTask ClosePanel(UIPanelBase panel, bool destroy = false)
+    {
+        await ClosePanelInternal(panel, destroy);
+    }
+
+    /// <summary>
+    /// 内部关闭面板逻辑
+    /// </summary>
+    /// <param name="panel">要关闭的面板</param>
+    /// <param name="destroy">是否强制销毁面板</param>
+    private async UniTask ClosePanelInternal(UIPanelBase panel, bool destroy)
     {
         if (panel == null) return;
 
@@ -436,6 +432,15 @@ public class UIMgr : MonoSingleton<UIMgr>
         {
             Debug.Log($"正在播放UI动画，忽略关闭面板请求: {panel.PanelName}");
             return;
+        }
+
+        // 获取面板配置信息（用于获取动画类型）
+        string panelName = panel.PanelName;
+        UIPanelAnimType animType = UIPanelAnimType.None;
+
+        if (_panelConfigs.TryGetValue(panelName, out var config))
+        {
+            animType = config.AnimType;
         }
 
         // 播放关闭音效
@@ -458,22 +463,13 @@ public class UIMgr : MonoSingleton<UIMgr>
 
         if (destroy)
         {
-            // 销毁面板
+            // 强制销毁面板
             panel.DestroyPanel();
-
-            if (usePool)
-            {
-                // 回收到对象池
-                RecycleToPool(panel.gameObject, panel.GetType());
-            }
-            else
-            {
-                Destroy(panel.gameObject);
-            }
+            Destroy(panel.gameObject);
         }
-        else if (usePool)
+        else
         {
-            // 不销毁但回收到对象池
+            // 默认回收到对象池
             panel.DestroyPanel();
             RecycleToPool(panel.gameObject, panel.GetType());
         }
@@ -494,7 +490,7 @@ public class UIMgr : MonoSingleton<UIMgr>
         }
 
         var currentPanel = _uiStack.Pop();
-        await ClosePanel(currentPanel, usePool: true);
+        await ClosePanel(currentPanel);
 
         // 显示栈顶的面板（如果存在）
         if (_uiStack.Count > 0)
@@ -518,25 +514,9 @@ public class UIMgr : MonoSingleton<UIMgr>
         string panelName = typeof(T).Name;
         string prefabPath = $"Prefabs/UI/{panelName}";
         GameObject panelGo = null;
-        GameObject prefab = null;
 
-        // 先获取预制体
-        if (_uiPrefabCache.TryGetValue(prefabPath, out prefab))
-        {
-            // 使用缓存
-        }
-        else
-        {
-            // 加载预制体
-            prefab = await LoadUIPrefab(prefabPath);
-
-            // 缓存预制体（所有面板都缓存）
-            if (prefab != null)
-            {
-                _uiPrefabCache[prefabPath] = prefab;
-            }
-        }
-
+        // 加载并缓存预制体
+        var prefab = await LoadAndCachePrefab(prefabPath);
         if (prefab == null)
         {
             Debug.LogError($"加载UI预制体失败: {prefabPath}");
@@ -581,6 +561,31 @@ public class UIMgr : MonoSingleton<UIMgr>
     }
 
 
+
+    /// <summary>
+    /// 加载并缓存UI预制体
+    /// </summary>
+    /// <param name="prefabPath">预制体路径</param>
+    /// <returns>预制体GameObject</returns>
+    private async UniTask<GameObject> LoadAndCachePrefab(string prefabPath)
+    {
+        // 检查缓存
+        if (_uiPrefabCache.TryGetValue(prefabPath, out var cachedPrefab))
+        {
+            return cachedPrefab;
+        }
+
+        // 加载预制体
+        var prefab = await LoadUIPrefab(prefabPath);
+
+        // 缓存预制体（所有预制体都缓存）
+        if (prefab != null)
+        {
+            _uiPrefabCache[prefabPath] = prefab;
+        }
+
+        return prefab;
+    }
 
     /// <summary>
     /// 加载UI预制体

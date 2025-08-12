@@ -27,7 +27,7 @@ public static class ExcelWatcher
     {
         _watcher?.Dispose();
 
-        string root = ExcelExporterSettings.Instance.ExcelFullPath;
+        string root = SimpleToolkitSettings.Instance.ExcelRelativePath;
         if (!Directory.Exists(root)) Directory.CreateDirectory(root);
 
         _watcher = new FileSystemWatcher(root)

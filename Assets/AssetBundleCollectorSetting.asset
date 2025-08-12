@@ -24,13 +24,39 @@ MonoBehaviour:
     AutoCollectShaders: 1
     IgnoreRuleName: NormalIgnoreRule
     Groups:
-    - GroupName: ui
+    - GroupName: UI
       GroupDesc: "\u9762\u677F"
-      AssetTags: ui
+      AssetTags: UI
       ActiveRuleName: EnableGroup
       Collectors:
       - CollectPath: Assets/GameRes/UI
         CollectorGUID: 03197eed7735577488544473b4447e91
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: JsonConfigs
+      GroupDesc: "Json \u914D\u7F6E\u6570\u636E"
+      AssetTags: JsonConfigs
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Resources/JsonConfigs
+        CollectorGUID: 28f373b9f89658844ad276c58b31756a
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Prefabs
+      GroupDesc: "\u9884\u5236\u4F53"
+      AssetTags: Prefab
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Resources/Prefabs
+        CollectorGUID: 623b6fa4b96276a4e813d5a4680d6ff3
         CollectorType: 0
         AddressRuleName: AddressByFileName
         PackRuleName: PackDirectory

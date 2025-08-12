@@ -41,12 +41,12 @@ public class EditorUtils
         Formatting = Formatting.Indented,
     };
 
-    [MenuItem("Tools/Excel To Json")]
+    [MenuItem("Simple Toolkit/Excel To Json")]
     public static void GenerateConfigs()
     {
         DeleteAllOldFiles();
 
-        string excelDirPath = ExcelExporterSettings.Instance.ExcelFullPath;
+        string excelDirPath = SimpleToolkitSettings.Instance.ExcelRelativePath;
         if (!Directory.Exists(excelDirPath)) Directory.CreateDirectory(excelDirPath);
 
         string[] excelFiles = Directory.EnumerateFiles(excelDirPath)
@@ -161,7 +161,7 @@ public class EditorUtils
     /// <param name="configName"></param>
     private static void GenerateConfigClass(List<PropertyInfo> properties, string configName)
     {
-        string filePath = Path.Combine(ExcelExporterSettings.Instance.CsFullPath, $"{configName}Config.cs");
+        string filePath = Path.Combine(SimpleToolkitSettings.Instance.CsRelativePath, $"{configName}Config.cs");
         string fileDir = Path.GetDirectoryName(filePath);
         if (string.IsNullOrEmpty(fileDir)) fileDir = Path.Combine(Application.dataPath, "Scripts", "Configs");
         if (!Directory.Exists(fileDir)) Directory.CreateDirectory(fileDir);
@@ -195,7 +195,7 @@ public class EditorUtils
     /// <param name="excelConfig"></param>
     private static void GenerateConfigJson(ExcelConfig excelConfig)
     {
-        string filePath = Path.Combine(ExcelExporterSettings.Instance.JsonFullPath, $"{excelConfig.ConfigName}Config.json");
+        string filePath = Path.Combine(SimpleToolkitSettings.Instance.JsonRelativePath, $"{excelConfig.ConfigName}Config.json");
         string fileDir = Path.GetDirectoryName(filePath);
         if (string.IsNullOrEmpty(fileDir)) fileDir = Path.Combine(Application.dataPath, "Resources", "JsonConfigs");
         if (!Directory.Exists(fileDir)) Directory.CreateDirectory(fileDir);
@@ -355,11 +355,11 @@ public class EditorUtils
     /// </summary>
     private static void DeleteAllOldFiles()
     {
-        var settings = ExcelExporterSettings.Instance;
+        var settings = SimpleToolkitSettings.Instance;
 
-        if (Directory.Exists(settings.CsFullPath)) Directory.Delete(settings.CsFullPath, true);
-        if (Directory.Exists(settings.JsonFullPath)) Directory.Delete(settings.JsonFullPath, true);
-        Directory.CreateDirectory(settings.CsFullPath);
-        Directory.CreateDirectory(settings.JsonFullPath);
+        if (Directory.Exists(settings.CsRelativePath)) Directory.Delete(settings.CsRelativePath, true);
+        if (Directory.Exists(settings.JsonRelativePath)) Directory.Delete(settings.JsonRelativePath, true);
+        Directory.CreateDirectory(settings.CsRelativePath);
+        Directory.CreateDirectory(settings.JsonRelativePath);
     }
 }

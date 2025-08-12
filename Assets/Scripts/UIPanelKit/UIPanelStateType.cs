@@ -9,10 +9,6 @@ public enum UIPanelStateType
     /// </summary>
     None,
     /// <summary>
-    /// 正在加载
-    /// </summary>
-    Loading,
-    /// <summary>
     /// 已加载但未显示
     /// </summary>
     Loaded,
@@ -23,9 +19,5 @@ public enum UIPanelStateType
     /// <summary>
     /// 已隐藏
     /// </summary>
-    Hidden,
-    /// <summary>
-    /// 已销毁
-    /// </summary>
-    Destroyed
+    Hidden
 }

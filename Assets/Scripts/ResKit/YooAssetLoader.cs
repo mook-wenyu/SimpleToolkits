@@ -1,0 +1,387 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.U2D;
+using YooAsset;
+using Object = UnityEngine.Object;
+
+/// <summary>
+/// YooAsset资源加载器
+/// 采用"即时卸载"策略：使用using语句自动管理AssetHandle生命周期，使用字典缓存管理
+/// </summary>
+public class YooAssetLoader : IResLoader
+{
+    private readonly Dictionary<string, Object> _assetCache = new();
+
+    /// <summary>
+    /// 获取运行模式。
+    /// </summary>
+    public readonly EPlayMode playMode;
+
+    public YooAssetLoader() : this(EPlayMode.OfflinePlayMode) { }
+
+    public YooAssetLoader(EPlayMode gamePlayMode)
+    {
+        playMode = gamePlayMode;
+
+        #if UNITY_EDITOR
+        playMode = EPlayMode.EditorSimulateMode;
+        #elif UNITY_WEBGL
+            PlayMode = EPlayMode.WebPlayMode;
+        #endif
+
+        // 初始化资源系统
+        YooAssets.Initialize();
+        YooAssets.SetOperationSystemMaxTimeSlice(30);
+        // YooAssets.SetCacheSystemCachedFileVerifyLevel(EVerifyLevel.High);
+        // YooAssets.SetDownloadSystemBreakpointResumeFileSize(4096 * 8);
+        
+        Debug.Log($"资源系统运行模式：{playMode}\nYooAsset 资源加载器，初始化完成！");
+    }
+
+    /// <summary>
+    /// 初始化资源包
+    /// </summary>
+    /// <param name="packageName">资源包名称</param>
+    /// <param name="hostServerURL">主服务器地址</param>
+    /// <param name="fallbackHostServerURL">备用服务器地址</param>
+    /// <param name="isDefaultPackage">是否为默认资源包，约定 “DefaultPackage” 默认为默认的资源包</param>
+    public async UniTask<bool> InitPackageAsync(string packageName, string hostServerURL = "", string fallbackHostServerURL = "", bool isDefaultPackage = false)
+    {
+        var resourcePackage = YooAssets.TryGetPackage(packageName);
+        if (resourcePackage == null)
+        {
+            resourcePackage = YooAssets.CreatePackage(packageName);
+            if (packageName == Constants.DefaultPackageName || isDefaultPackage)
+            {
+                // 设置该资源包为默认的资源包，可以使用YooAssets相关加载接口加载该资源包内容。
+                YooAssets.SetDefaultPackage(resourcePackage);
+            }
+        }
+
+        var initializationOperationHandler = CreateInitializationOperationHandler(resourcePackage, hostServerURL, fallbackHostServerURL);
+        await initializationOperationHandler;
+
+        if (initializationOperationHandler.Status != EOperationStatus.Succeed)
+        {
+            Debug.LogError($"资源包初始化失败：{initializationOperationHandler.Error}");
+            return false;
+        }
+
+        bool result = await RequestPackageVersionAndUpdatePackageManifest(resourcePackage);
+
+        Debug.Log($"资源包：{packageName}，初始化完成：{result}");
+        return result;
+    }
+
+    /// <summary>
+    /// 初始化编辑器模拟模式 (EditorSimulateMode)
+    /// </summary>
+    /// <param name="resourcePackage">资源包</param>
+    /// <returns></returns>
+    private InitializationOperation InitializeYooAssetEditorSimulateMode(ResourcePackage resourcePackage)
+    {
+        var buildResult = EditorSimulateModeHelper.SimulateBuild(resourcePackage.PackageName);
+        string packageRoot = buildResult.PackageRootDirectory;
+        var editorFileSystemParams = FileSystemParameters.CreateDefaultEditorFileSystemParameters(packageRoot);
+        var initParameters = new EditorSimulateModeParameters
+        {
+            EditorFileSystemParameters = editorFileSystemParams
+        };
+        return resourcePackage.InitializeAsync(initParameters);
+    }
+
+    /// <summary>
+    /// 初始化单机运行模式 (OfflinePlayMode)
+    /// </summary>
+    /// <param name="resourcePackage">资源包</param>
+    /// <returns></returns>
+    private InitializationOperation InitializeYooAssetOfflinePlayMode(ResourcePackage resourcePackage)
+    {
+        var buildinFileSystemParams = FileSystemParameters.CreateDefaultBuildinFileSystemParameters();
+        var initParameters = new OfflinePlayModeParameters
+        {
+            BuildinFileSystemParameters = buildinFileSystemParams
+        };
+        return resourcePackage.InitializeAsync(initParameters);
+    }
+
+    /// <summary>
+    /// 初始化联机运行模式 (HostPlayMode)
+    /// </summary>
+    /// <param name="resourcePackage">资源包</param>
+    /// <param name="defaultHostServer"></param>
+    /// <param name="fallbackHostServer"></param>
+    /// <returns></returns>
+    private InitializationOperation InitializeYooAssetHostPlayMode(ResourcePackage resourcePackage, string defaultHostServer, string fallbackHostServer)
+    {
+        IRemoteServices remoteServices = new RemoteServices(defaultHostServer, fallbackHostServer);
+        var cacheFileSystemParams = FileSystemParameters.CreateDefaultCacheFileSystemParameters(remoteServices);
+        var buildinFileSystemParams = FileSystemParameters.CreateDefaultBuildinFileSystemParameters();
+
+        var initParameters = new HostPlayModeParameters
+        {
+            BuildinFileSystemParameters = buildinFileSystemParams,
+            CacheFileSystemParameters = cacheFileSystemParams
+        };
+        return resourcePackage.InitializeAsync(initParameters);
+    }
+
+    /// <summary>
+    /// 初始化 Web运行模式 (WebPlayMode)
+    /// </summary>
+    /// <param name="resourcePackage">资源包</param>
+    /// <param name="defaultHostServer"></param>
+    /// <param name="fallbackHostServer"></param>
+    /// <returns></returns>
+    private InitializationOperation InitializeYooAssetWebPlayMode(ResourcePackage resourcePackage, string defaultHostServer, string fallbackHostServer)
+    {
+        //说明：RemoteServices类定义请参考联机运行模式！
+        IRemoteServices remoteServices = new RemoteServices(defaultHostServer, fallbackHostServer);
+        var webServerFileSystemParams = FileSystemParameters.CreateDefaultWebServerFileSystemParameters();
+        var webRemoteFileSystemParams = FileSystemParameters.CreateDefaultWebRemoteFileSystemParameters(remoteServices); //支持跨域下载
+
+        var initParameters = new WebPlayModeParameters
+        {
+            WebServerFileSystemParameters = webServerFileSystemParams,
+            WebRemoteFileSystemParameters = webRemoteFileSystemParams
+        };
+        return resourcePackage.InitializeAsync(initParameters);
+    }
+
+    /// <summary>
+    /// 请求包版本并更新包清单
+    /// </summary>
+    private async UniTask<bool> RequestPackageVersionAndUpdatePackageManifest(ResourcePackage package)
+    {
+        var versionOperation = package.RequestPackageVersionAsync();
+        await versionOperation;
+
+        if (versionOperation.Status != EOperationStatus.Succeed)
+        {
+            Debug.LogError($"获取包版本失败：{versionOperation.Error}");
+            return false;
+        }
+
+        var manifestOperation = package.UpdatePackageManifestAsync(versionOperation.PackageVersion);
+        await manifestOperation;
+
+        if (manifestOperation.Status != EOperationStatus.Succeed)
+        {
+            Debug.LogError($"更新包清单失败：{manifestOperation.Error}");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 根据运行模式创建初始化操作数据
+    /// </summary>
+    /// <returns></returns>
+    private InitializationOperation CreateInitializationOperationHandler(ResourcePackage resourcePackage, string hostServerURL, string fallbackHostServerURL)
+    {
+        switch (playMode)
+        {
+            case EPlayMode.EditorSimulateMode:
+            {
+                // 编辑器下的模拟模式
+                return InitializeYooAssetEditorSimulateMode(resourcePackage);
+            }
+            case EPlayMode.OfflinePlayMode:
+            {
+                // 单机运行模式
+                return InitializeYooAssetOfflinePlayMode(resourcePackage);
+            }
+            case EPlayMode.HostPlayMode:
+            {
+                // 联机运行模式
+                return InitializeYooAssetHostPlayMode(resourcePackage, hostServerURL, fallbackHostServerURL);
+            }
+            case EPlayMode.WebPlayMode:
+            {
+                // WebGL运行模式
+                return InitializeYooAssetWebPlayMode(resourcePackage, hostServerURL, fallbackHostServerURL);
+            }
+            default:
+            {
+                return null;
+            }
+        }
+    }
+
+    public async UniTask<T> LoadAssetAsync<T>(string location, Action<T> onCompleted = null) where T : Object
+    {
+        // 检查缓存
+        if (_assetCache.TryGetValue(location, out var cachedAsset) && cachedAsset is T cached)
+        {
+            onCompleted?.Invoke(cached);
+            return cached;
+        }
+
+        using var handle = YooAssets.LoadAssetAsync<T>(location);
+        await handle.ToUniTask();
+
+        if (handle.AssetObject is T asset)
+        {
+            _assetCache[location] = asset;
+
+            onCompleted?.Invoke(asset);
+            return asset;
+        }
+
+        onCompleted?.Invoke(null);
+        return null;
+    }
+
+    public async UniTask<T> LoadSubAssetAsync<T>(string location, string subName, Action<T> onCompleted = null) where T : Object
+    {
+        var cacheKey = $"{location}#{subName}";
+
+        // 检查缓存
+        if (_assetCache.TryGetValue(cacheKey, out var cachedAsset) && cachedAsset is T cached)
+        {
+            onCompleted?.Invoke(cached);
+            return cached;
+        }
+
+        using var handle = YooAssets.LoadSubAssetsAsync<T>(location);
+        await handle.ToUniTask();
+
+        var subAsset = handle.GetSubAssetObject<T>(subName);
+        if (subAsset != null)
+        {
+            _assetCache[cacheKey] = subAsset;
+
+            onCompleted?.Invoke(subAsset);
+            return subAsset;
+        }
+
+        onCompleted?.Invoke(null);
+        return null;
+    }
+
+    public async UniTask<Sprite> LoadSpriteAsync(string location, string spriteName, Action<Sprite> onCompleted = null)
+    {
+        var cacheKey = $"{location}@{spriteName}";
+
+        // 检查缓存
+        if (_assetCache.TryGetValue(cacheKey, out var cachedAsset) && cachedAsset is Sprite cached)
+        {
+            onCompleted?.Invoke(cached);
+            return cached;
+        }
+
+        using var handle = YooAssets.LoadAssetAsync<SpriteAtlas>(location);
+        await handle.ToUniTask();
+
+        if (handle.AssetObject is SpriteAtlas atlas)
+        {
+            var sprite = atlas.GetSprite(spriteName);
+            if (sprite != null)
+            {
+                _assetCache[cacheKey] = sprite;
+
+                onCompleted?.Invoke(sprite);
+                return sprite;
+            }
+        }
+
+        onCompleted?.Invoke(null);
+        return null;
+    }
+
+    public async UniTask<List<T>> LoadAllAssetAsync<T>(string location, Action<List<T>> onCompleted = null) where T : Object
+    {
+        var loadedAssets = new List<T>();
+
+        try
+        {
+            // 尝试作为资源标签获取资源信息列表
+            var assetInfos = YooAssets.GetAssetInfos(location);
+
+            if (assetInfos is {Length: > 0})
+            {
+                // 并行加载所有资源
+                var loadTasks = new List<UniTask<T>>();
+
+                foreach (var assetInfo in assetInfos)
+                {
+                    loadTasks.Add(LoadAssetAsync<T>(assetInfo.Address));
+                }
+
+                var results = await UniTask.WhenAll(loadTasks);
+
+                // 只添加成功加载的资源
+                foreach (var result in results)
+                {
+                    if (result != null)
+                    {
+                        loadedAssets.Add(result);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Failed to load asset from tag: {location}");
+                    }
+                }
+            }
+            else
+            {
+                // 如果不是标签，尝试作为单个资源路径加载
+                var asset = await LoadAssetAsync<T>(location);
+                if (asset != null)
+                {
+                    loadedAssets.Add(asset);
+                }
+                else
+                {
+                    Debug.LogWarning($"No assets found for location: {location}");
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"Error loading assets from location '{location}': {ex.Message}");
+        }
+
+        onCompleted?.Invoke(loadedAssets);
+        return loadedAssets;
+    }
+
+    public bool HasAsset(string location)
+    {
+        return _assetCache.ContainsKey(location);
+    }
+
+    public int GetCacheCount()
+    {
+        return _assetCache.Count;
+    }
+
+    public void ReleaseAsset(Object asset)
+    {
+        if (asset == null) return;
+
+        // 从缓存中移除该资源的所有条目
+        var keysToRemove = new List<string>();
+        foreach (var kvp in _assetCache)
+        {
+            if (kvp.Value == asset)
+            {
+                keysToRemove.Add(kvp.Key);
+            }
+        }
+
+        foreach (string key in keysToRemove)
+        {
+            _assetCache.Remove(key);
+        }
+    }
+
+    public void ReleaseAllAssets()
+    {
+        _assetCache.Clear();
+    }
+}

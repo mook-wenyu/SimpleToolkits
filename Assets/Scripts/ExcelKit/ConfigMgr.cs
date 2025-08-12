@@ -21,32 +21,21 @@ public static class ConfigMgr
     /// </summary>
     public static void Init()
     {
-        var isResources = false;
         var jsonPath = "JsonConfigs";
-        var excelSettings = Resources.Load<ExcelExporterSettings>("ExcelExporterSettings");
-        if (excelSettings != null)
+        var settings = ResMgr.Instance.Settings;
+        if (settings != null)
         {
-            isResources = excelSettings.jsonRelativePath.StartsWith("Resources/");
-            if (isResources)
-            {
-                jsonPath = excelSettings.jsonRelativePath["Resources/".Length..];
-            }
+            bool isResources = settings.jsonRelativePath.StartsWith("Assets/Resources/");
+            jsonPath = isResources ? settings.jsonRelativePath["Assets/Resources/".Length..] :
+                settings.jsonRelativePath;
+            
+            LoadAllHandled(jsonPath);
         }
-
-        if (isResources)
         {
             LoadAllFromResources(jsonPath);
         }
-        else
-        {
-            LoadAllFromAssetBundleAsync(jsonPath).Forget();
-        }
     }
 
-    /// <summary>
-    /// 从 Resources 加载所有配置数据
-    /// </summary>
-    /// <param name="jsonPath"></param>
     public static void LoadAllFromResources(string jsonPath)
     {
         var jsonConfigs = Resources.LoadAll<TextAsset>(jsonPath);
@@ -57,15 +46,19 @@ public static class ConfigMgr
         }
     }
 
-    public static async UniTaskVoid LoadAllFromAssetBundleAsync(string jsonPath)
+    public static void LoadAllHandled(string jsonPath, Action onCompleted = null)
     {
-        var assetInfos = ResMgr.Instance.GetAssetInfos(jsonPath);
-        foreach (var assetInfo in assetInfos)
+        ResMgr.Instance.LoadAllAssetAsync<TextAsset>(jsonPath, jsonConfigs =>
         {
-            var jsonConfig = await ResMgr.Instance.LoadAssetAsync<TextAsset>(assetInfo.AssetPath);
-            var config = JsonConvert.DeserializeObject<IReadOnlyDictionary<string, BaseConfig>>(jsonConfig.text, _jsonSerializerSettings);
-            _jsonData[jsonConfig.name] = config;
-        }
+            foreach (var jsonConfig in jsonConfigs)
+            {
+                var config = JsonConvert.DeserializeObject<IReadOnlyDictionary<string, BaseConfig>>(jsonConfig.text, _jsonSerializerSettings);
+                _jsonData[jsonConfig.name] = config;
+            }
+
+            // 加载完成回调
+            onCompleted?.Invoke();
+        }).Forget();
     }
 
     /// <summary>

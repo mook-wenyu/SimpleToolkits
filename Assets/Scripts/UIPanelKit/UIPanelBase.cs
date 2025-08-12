@@ -82,15 +82,6 @@ public abstract class UIPanelBase : MonoBehaviour
     }
 
     /// <summary>
-    /// 销毁面板
-    /// </summary>
-    public virtual void DestroyPanel()
-    {
-        mStateType = UIPanelStateType.Destroyed;
-        OnDestroyPanel();
-    }
-
-    /// <summary>
     /// 刷新面板
     /// </summary>
     public virtual void Refresh(object args = null)
@@ -112,11 +103,6 @@ public abstract class UIPanelBase : MonoBehaviour
     /// 隐藏回调
     /// </summary>
     protected virtual void OnHide() { }
-
-    /// <summary>
-    /// 销毁面板回调
-    /// </summary>
-    protected virtual void OnDestroyPanel() { }
 
     /// <summary>
     /// 刷新回调

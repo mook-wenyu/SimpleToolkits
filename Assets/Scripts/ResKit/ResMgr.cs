@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YooAsset;
+using Debug = UnityEngine.Debug;
 
 /// <summary>
 /// 资源加载器类型
@@ -23,22 +25,22 @@ public enum LoaderType
 /// <summary>
 /// 资源管理器
 /// </summary>
-public class ResMgr : MonoSingleton<ResMgr>
+public static class ResMgr
 {
     /// <summary>
     /// 资源加载器
     /// </summary>
-    public IResLoader ResLoader { get; private set; }
+    public static IResLoader ResLoader { get; private set; }
 
     /// <summary>
     /// 配置管理器设置
     /// </summary>
-    public SimpleToolkitSettings Settings { get; private set; }
+    public static SimpleToolkitSettings Settings { get; private set; }
 
     /// <summary>
     /// 初始化资源管理器
     /// </summary>
-    public async UniTask Init()
+    public static async UniTask Init()
     {
         Settings = Resources.Load<SimpleToolkitSettings>(Constants.SimpleToolkitSettingsName);
         SetResLoader(Settings.LoaderType);
@@ -49,7 +51,7 @@ public class ResMgr : MonoSingleton<ResMgr>
     /// 设置资源加载器
     /// </summary>
     /// <param name="loaderType">资源加载器类型</param>
-    private void SetResLoader(LoaderType loaderType)
+    private static void SetResLoader(LoaderType loaderType)
     {
         ResLoader = loaderType switch
         {
@@ -63,7 +65,7 @@ public class ResMgr : MonoSingleton<ResMgr>
     /// 并行初始化多个资源包
     /// </summary>
     /// <param name="packageInfos">资源包信息列表</param>
-    public async UniTask InitPackageAsync(List<YooPackageInfo> packageInfos)
+    public static async UniTask InitPackageAsync(List<YooPackageInfo> packageInfos)
     {
         if (ResLoader is not YooAssetLoader loader)
         {
@@ -109,7 +111,7 @@ public class ResMgr : MonoSingleton<ResMgr>
     /// <param name="location">资源的定位地址</param>
     /// <param name="onCompleted">加载完成回调</param>
     /// <typeparam name="TObject">资源类型</typeparam>
-    public async UniTask<TObject> LoadAssetAsync<TObject>(string location, Action<TObject> onCompleted = null) where TObject : UnityEngine.Object
+    public static async UniTask<TObject> LoadAssetAsync<TObject>(string location, Action<TObject> onCompleted = null) where TObject : UnityEngine.Object
     {
         return await ResLoader.LoadAssetAsync<TObject>(location, onCompleted);
     }
@@ -121,7 +123,7 @@ public class ResMgr : MonoSingleton<ResMgr>
     /// <param name="location">资源的定位地址</param>
     /// <param name="onCompleted">加载完成回调</param>
     /// <typeparam name="TObject">资源类型</typeparam>
-    public async UniTask<TObject> LoadSubAssetsAsync<TObject>(string subName, string location, Action<TObject> onCompleted = null) where TObject : UnityEngine.Object
+    public static async UniTask<TObject> LoadSubAssetsAsync<TObject>(string subName, string location, Action<TObject> onCompleted = null) where TObject : UnityEngine.Object
     {
         using var handle = YooAssets.LoadSubAssetsAsync<TObject>(location);
         await handle.ToUniTask();
@@ -137,7 +139,7 @@ public class ResMgr : MonoSingleton<ResMgr>
     /// <param name="location">资源的定位地址</param>
     /// <param name="spriteName">包含的精灵名称</param>
     /// <param name="onCompleted">加载完成回调</param>
-    public async UniTask<Sprite> LoadSpriteAtlasAsync(string location, string spriteName, Action<Sprite> onCompleted = null)
+    public static async UniTask<Sprite> LoadSpriteAtlasAsync(string location, string spriteName, Action<Sprite> onCompleted = null)
     {
         return await ResLoader.LoadSpriteAsync(location, spriteName, onCompleted);
     }
@@ -148,7 +150,7 @@ public class ResMgr : MonoSingleton<ResMgr>
     /// <param name="location">资源的定位地址</param>
     /// <param name="onCompleted">加载完成回调</param>
     /// <typeparam name="TObject">资源类型</typeparam>
-    public async UniTask<List<TObject>> LoadAllAssetAsync<TObject>(string location, Action<List<TObject>> onCompleted = null) where TObject : UnityEngine.Object
+    public static async UniTask<List<TObject>> LoadAllAssetAsync<TObject>(string location, Action<List<TObject>> onCompleted = null) where TObject : UnityEngine.Object
     {
         return await ResLoader.LoadAllAssetAsync<TObject>(location, onCompleted);
     }

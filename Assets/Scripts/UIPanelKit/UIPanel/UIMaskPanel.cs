@@ -1,16 +1,24 @@
-﻿using UnityEngine.UI;
+﻿using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// UI遮罩面板
-/// 继承UIPanelBase，使用统一的面板管理机制和对象池系统
+/// 简化的遮罩实现，不继承UIPanelBase，避免重复释放问题
 /// </summary>
-public class UIMaskPanel : UIPanelBase
+public class UIMaskPanel : MonoBehaviour
 {
     /// <summary>
-    /// 隐藏遮罩
+    /// 显示遮罩
     /// </summary>
-    /// <param name="destroy">是否销毁</param>
-    public override void Hide(bool destroy = false)
+    public void Show()
+    {
+        gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// 隐藏遮罩并清理资源
+    /// </summary>
+    public void Hide()
     {
         // 清理按钮事件
         var btn = GetComponent<Button>();
@@ -18,8 +26,8 @@ public class UIMaskPanel : UIPanelBase
         {
             btn.onClick.RemoveAllListeners();
         }
-        
-        base.Hide(destroy);
-    }
 
+        // 隐藏对象
+        gameObject.SetActive(false);
+    }
 }

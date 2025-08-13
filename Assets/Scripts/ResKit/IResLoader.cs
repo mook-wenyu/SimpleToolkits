@@ -54,10 +54,10 @@ public interface IResLoader
     /// 释放资源
     /// </summary>
     /// <param name="asset">要释放的资源</param>
-    void ReleaseAsset(Object asset);
+    void Release(Object asset);
 
     /// <summary>
     /// 释放所有资源并清空缓存
     /// </summary>
-    void ReleaseAllAssets();
+    void UnloadAllAssetsAsync();
 }

@@ -31,8 +31,7 @@ public class PoolMgr : MonoSingleton<PoolMgr>
     /// <param name="actionOnDestroy">销毁对象时的回调</param>
     /// <param name="defaultCapacity">默认容量</param>
     /// <param name="maxSize">最大容量</param>
-    /// <returns>对象池实例</returns>
-    public ObjectPool<T> GetOrCreatePool<T>(
+    public bool GetOrCreatePool<T>(
         string poolName,
         Func<T> createFunc,
         Action<T> actionOnGet = null,
@@ -41,9 +40,9 @@ public class PoolMgr : MonoSingleton<PoolMgr>
         int defaultCapacity = 1,
         int maxSize = 20) where T : Object
     {
-        if (_pools.TryGetValue(poolName, out var existingPool) && existingPool is ObjPool<T> typedPool)
+        if (_pools.TryGetValue(poolName, out var existingPool) && existingPool is ObjPool<T>)
         {
-            return typedPool.objPool;
+            return true;
         }
 
         // 创建新的对象池
@@ -57,9 +56,11 @@ public class PoolMgr : MonoSingleton<PoolMgr>
         );
 
         _pools[poolName] = new ObjPool<T>(pool);
-        Debug.Log($"创建对象池: {poolName}");
 
-        return pool;
+        if (_pools.ContainsKey(poolName)) return true;
+
+        Debug.LogError($"对象池 {poolName} 创建失败");
+        return false;
     }
 
     /// <summary>

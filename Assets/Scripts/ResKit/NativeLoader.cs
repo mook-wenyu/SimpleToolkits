@@ -108,7 +108,7 @@ public class NativeLoader : IResLoader
         return _assetCache.Count;
     }
 
-    public void ReleaseAsset(Object asset)
+    public void Release(Object asset)
     {
         if (asset == null) return;
 
@@ -129,7 +129,7 @@ public class NativeLoader : IResLoader
         // 扩展点：可以在这里实现原生的资源释放
     }
 
-    public void ReleaseAllAssets()
+    public void UnloadAllAssetsAsync()
     {
         _assetCache.Clear();
         // 扩展点：可以在这里实现原生的批量资源释放

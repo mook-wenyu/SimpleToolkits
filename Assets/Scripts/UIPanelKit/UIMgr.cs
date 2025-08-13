@@ -21,17 +21,20 @@ public class UIMgr : MonoSingleton<UIMgr>
     // 当前打开的UI面板实例（使用UniqueId作为key）
     private readonly Dictionary<string, UIPanelBase> _openedPanelDict = new();
 
-    // UI预制体缓存
-    private readonly Dictionary<string, GameObject> _uiPrefabCache = new();
-
     // UI面板配置信息存储（面板类型名称 -> 配置信息）
     private readonly Dictionary<string, UIPanelInfo> _panelConfigs = new();
 
     // UI栈(用于管理UI层级关系和返回逻辑)
     private readonly Stack<UIPanelBase> _uiStack = new();
 
+    // 正在隐藏的面板集合（用于防止重复隐藏）
+    private readonly HashSet<string> _hidingPanels = new();
+
     // 是否正在执行UI动画（用于防止动画过程中重复操作）
-    private bool _isPlayingAnim = false;
+    private bool _isPlayingAnim;
+
+    // 是否正在执行GoBack操作（用于防止重复的GoBack调用）
+    private bool _isGoingBack;
 
     #region 初始化
     /// <summary>
@@ -41,7 +44,9 @@ public class UIMgr : MonoSingleton<UIMgr>
     {
         InitializeCanvas();
         InitLayers();
-        await InitMaskPrefabAsync();
+        InitMaskPrefab();
+
+        await UniTask.CompletedTask;
     }
 
     /// <summary>
@@ -57,7 +62,7 @@ public class UIMgr : MonoSingleton<UIMgr>
         // 如果没有找到，则创建新的
         _uiCanvas = gameObject.AddComponent<Canvas>();
         _uiCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        _uiCanvas.sortingOrder = 100;
+        _uiCanvas.sortingOrder = 200;
 
         // 添加CanvasScaler组件
         var scaler = gameObject.AddComponent<CanvasScaler>();
@@ -88,11 +93,14 @@ public class UIMgr : MonoSingleton<UIMgr>
         var layerTypes = (UILayerType[])Enum.GetValues(typeof(UILayerType));
         foreach (var layer in layerTypes)
         {
+            // 跳过无效层级
+            if (layer == UILayerType.None) continue;
+
             // 检查是否已存在该层级
             var existingLayer = _uiCanvas.transform.Find($"Layer_{layer.ToString()}");
             if (existingLayer)
             {
-                _layerDict.Add(layer, existingLayer as RectTransform);
+                _layerDict[layer] = existingLayer as RectTransform;
                 continue;
             }
 
@@ -111,24 +119,42 @@ public class UIMgr : MonoSingleton<UIMgr>
             // 设置层级顺序
             rect.SetSiblingIndex((int)layer);
 
-            _layerDict.Add(layer, rect);
+            _layerDict[layer] = rect;
         }
-    }
-
-    /// <summary>
-    /// 初始化遮罩预制体
-    /// </summary>
-    private async UniTask InitMaskPrefabAsync()
-    {
-        // 加载并缓存遮罩预制体
-        var maskPrefab = await LoadAndCachePrefab<UIMaskPanel>();
-
-        // 创建遮罩对象池
-        GetOrCreateUIPool<UIMaskPanel>(maskPrefab);
     }
     #endregion
 
     #region UI面板管理
+    /// <summary>
+    /// 确保面板资源已准备（加载预制体、缓存管理并创建对象池）
+    /// </summary>
+    /// <returns>资源准备是否成功</returns>
+    private async UniTask<bool> EnsurePanelResourcesAsync<T>() where T : UIPanelBase
+    {
+        // 构建预制体路径
+        string prefabPath = typeof(T).Name;
+        string uiPanelPath = ResMgr.Settings.UIPanelPath;
+        if (!string.IsNullOrEmpty(uiPanelPath))
+        {
+            prefabPath = $"{uiPanelPath}/{prefabPath}";
+        }
+
+        // 加载预制体
+        var prefab = await ResMgr.LoadAssetAsync<GameObject>(prefabPath);
+        if (!prefab)
+        {
+            Debug.LogError($"加载UI预制体失败: {typeof(T).Name}, 路径: {prefabPath}");
+            return false;
+        }
+
+        // 创建对象池
+        bool pool = GetOrCreateUIPool<T>(prefab);
+        if (pool) return true;
+
+        Debug.LogError($"创建对象池失败: {typeof(T).Name}");
+        return false;
+    }
+
     /// <summary>
     /// 预注册面板（提前创建实例并放入对象池）
     /// </summary>
@@ -136,13 +162,13 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// <param name="preCreateCount">预创建数量</param>
     /// <param name="layer">UI层级</param>
     /// <param name="allowMultiple">是否允许多实例</param>
-    /// <param name="fullscreen">是否全屏面板</param>
     /// <param name="needMask">是否需要背景遮罩</param>
-    /// <param name="closeByOutside">是否可以点击外部关闭</param>
+    /// <param name="closeByOutside">是否可以点击外部隐藏</param>
     /// <param name="animType">面板动画类型</param>
-    public async UniTask<bool> RegisterPanel<T>(int preCreateCount = 1, UILayerType layer = UILayerType.Panel,
-        bool allowMultiple = false, bool fullscreen = false, bool needMask = false,
-        bool closeByOutside = false, UIPanelAnimType animType = UIPanelAnimType.None) where T : UIPanelBase
+    public async UniTask<bool> RegisterPanel<T>(UILayerType layer = UILayerType.Panel,
+        bool allowMultiple = false, bool needMask = false,
+        bool closeByOutside = false, UIPanelAnimType animType = UIPanelAnimType.None,
+        int preCreateCount = 1) where T : UIPanelBase
     {
         // 获取面板名称
         string panelName = typeof(T).Name;
@@ -156,44 +182,44 @@ public class UIMgr : MonoSingleton<UIMgr>
         // 创建并存储面板配置信息
         var panelInfo = new UIPanelInfo
         {
-            PanelType = typeof(T),
-            Layer = layer,
-            AllowMultiple = allowMultiple,
-            Fullscreen = fullscreen,
-            NeedMask = needMask,
-            CloseByOutside = closeByOutside,
-            AnimType = animType
+            panelType = typeof(T),
+            layer = layer,
+            allowMultiple = allowMultiple.ToBoolType(),
+            needMask = needMask.ToBoolType(),
+            closeByOutside = closeByOutside.ToBoolType(),
+            animType = animType
         };
 
         // 存储面板配置
         _panelConfigs[panelName] = panelInfo;
 
-        // 加载并缓存预制体
-        var prefab = await LoadAndCachePrefab<T>();
-        if (prefab == null)
+        // 确保面板资源已准备（加载预制体、缓存并创建对象池）
+        bool success = await EnsurePanelResourcesAsync<T>();
+        if (!success)
         {
             Debug.LogError($"预注册面板失败，无法加载预制体: {panelName}");
             return false;
         }
 
-        // 创建对象池并预创建实例（所有面板都使用对象池）
-        var pool = GetOrCreateUIPool<T>(prefab);
-
-        // 预创建指定数量的实例
+        // 预创建指定数量的实例并确保正确初始化
         var tempPanels = new GameObject[preCreateCount];
         for (var i = 0; i < preCreateCount; i++)
         {
-            tempPanels[i] = pool.Get();
+            // 从对象池获取GameObject
+            tempPanels[i] = GetFromUIPool<T>();
+
+            // 初始化面板
+            tempPanels[i].GetComponent<T>().Init(this);
         }
 
         // 立即释放回对象池
         for (var i = 0; i < preCreateCount; i++)
         {
-            pool.Release(tempPanels[i]);
+            RecycleToUIPool(tempPanels[i], panelName);
         }
-
-        Debug.Log($"预注册面板 {panelName} 成功，预创建了 {preCreateCount} 个实例");
-
+#if UNITY_EDITOR
+        Debug.Log($"预注册面板 {panelName} 成功，预创建了 {preCreateCount} 个已初始化的实例");
+#endif
         return true;
     }
 
@@ -209,7 +235,27 @@ public class UIMgr : MonoSingleton<UIMgr>
         var panelInfo = GetPanelConfig<T>();
 
         // 使用配置信息打开面板
-        return await OpenPanelWithConfig<T>(args, panelInfo);
+        return await OpenPanelInternal<T>(args, panelInfo);
+    }
+
+    /// <summary>
+    /// 打开UI面板（使用部分自定义配置，未指定的参数使用默认配置）
+    /// </summary>
+    /// <typeparam name="T">面板类型</typeparam>
+    /// <param name="args">传递给面板的参数</param>
+    /// <param name="info">部分配置信息，只需要设置需要自定义的属性</param>
+    /// <returns>面板实例</returns>
+    public async UniTask<T> OpenPanel<T>(object args, UIPanelInfo info) where T : UIPanelBase
+    {
+        // 获取默认配置
+        var defaultConfig = GetPanelConfig<T>();
+
+        // 创建合并后的配置
+        var mergedConfig = defaultConfig.Clone();
+        mergedConfig.MergeFrom(in info);
+
+        // 使用合并后的配置打开面板
+        return await OpenPanelInternal<T>(args, mergedConfig);
     }
 
     /// <summary>
@@ -229,23 +275,22 @@ public class UIMgr : MonoSingleton<UIMgr>
         Debug.LogWarning($"面板 {panelName} 未注册，使用默认配置。建议先调用RegisterPanel进行注册。");
         return new UIPanelInfo
         {
-            PanelType = typeof(T),
-            Layer = UILayerType.Panel,
-            AllowMultiple = false,
-            Fullscreen = false,
-            NeedMask = false,
-            CloseByOutside = false,
-            AnimType = UIPanelAnimType.None
+            panelType = typeof(T),
+            layer = UILayerType.Panel,
+            allowMultiple = BoolType.False,
+            needMask = BoolType.False,
+            closeByOutside = BoolType.False,
+            animType = UIPanelAnimType.None
         };
     }
 
     /// <summary>
-    /// 使用配置信息打开UI面板
+    /// 内部打开UI面板
     /// </summary>
     /// <typeparam name="T">面板类型</typeparam>
     /// <param name="args">传递给面板的参数</param>
     /// <param name="panelInfo">面板配置信息</param>
-    private async UniTask<T> OpenPanelWithConfig<T>(object args, UIPanelInfo panelInfo) where T : UIPanelBase
+    private async UniTask<T> OpenPanelInternal<T>(object args, UIPanelInfo panelInfo) where T : UIPanelBase
     {
         // 如果正在播放动画，则忽略重复操作
         if (_isPlayingAnim)
@@ -257,132 +302,104 @@ public class UIMgr : MonoSingleton<UIMgr>
         string panelName = typeof(T).Name;
 
         // 检查面板是否已打开（如果不允许多实例）
-        if (!panelInfo.AllowMultiple)
+        if (!panelInfo.allowMultiple.ToBool())
         {
             // 查找是否已有同类型的面板在显示
             foreach (var kvp in _openedPanelDict)
             {
-                if (kvp.Value.PanelName == panelName)
-                {
-                    // 如果已经打开并不允许多实例，则刷新并返回现有面板
-                    kvp.Value.Refresh(args);
-                    return kvp.Value as T;
-                }
+                if (kvp.Value.PanelName != panelName) continue;
+
+                // 如果已经打开并不允许多实例，则刷新并返回现有面板
+                kvp.Value.Refresh(args);
+#if UNITY_EDITOR
+                Debug.Log("面板已打开，刷新并返回现有面板");
+#endif
+                return kvp.Value as T;
             }
         }
 
         UIPanelBase panel = null;
 
-        // 优先从对象池获取面板实例（所有面板都使用对象池）
         var pooledObject = GetFromUIPool<T>();
-        if (pooledObject != null)
+        if (pooledObject)
         {
             panel = pooledObject.GetComponent<T>();
-            Debug.Log($"从对象池获取面板: {panelName}");
         }
 
-        // 如果对象池中没有可用实例，则创建新实例
-        if (panel == null)
+        if (panel)
         {
-            panel = await CreatePanelInstance<T>(panelInfo.Layer, panelInfo.Fullscreen);
-            if (panel == null)
-            {
-                Debug.LogError($"创建面板失败: {panelName}");
-                return null;
-            }
+            // 重新设置父对象和位置（对象池中的面板可能位置不正确）
+            var layerTrans = _layerDict[panelInfo.layer];
+            panel.transform.SetParent(layerTrans, false);
+            panel.transform.SetAsLastSibling();
+
+            // 初始化面板
+            panel.Init(this);
         }
         else
         {
-            // 重新设置父对象和位置（对象池中的面板可能位置不正确）
-            var layerTrans = _layerDict[panelInfo.Layer];
-            panel.transform.SetParent(layerTrans, false);
-
-            var rectTrans = panel.GetComponent<RectTransform>();
-            if (panelInfo.Fullscreen)
-            {
-                rectTrans.anchorMin = Vector2.zero;
-                rectTrans.anchorMax = Vector2.one;
-                rectTrans.offsetMin = Vector2.zero;
-                rectTrans.offsetMax = Vector2.zero;
-            }
-
-            rectTrans.localScale = Vector3.one;
+            Debug.LogError($"无法创建面板实例: {panelName}");
+            return null;
         }
 
         // 添加到正在显示的面板字典
         _openedPanelDict[panel.UniqueId] = panel;
 
         // 创建背景遮罩
-        if (panelInfo.NeedMask)
+        if (panelInfo.needMask.ToBool())
         {
-            CreatePanelMask(panel, panelInfo.CloseByOutside);
+            CreatePanelMask(panel, panelInfo.closeByOutside.ToBool());
         }
 
         // 播放打开动画
-        await PlayPanelAnimation(panel, panelInfo.AnimType, true);
+        await PlayPanelAnimation(panel, panelInfo.animType, true);
 
         // 显示面板
         panel.Show(args);
 
         // 管理UI栈（默认添加到栈中）
         _uiStack.Push(panel);
-
+#if UNITY_EDITOR
         Debug.Log($"面板 {panel.PanelName}({panel.UniqueId}) 已显示");
-
-        return panel as T;
+#endif
+        return (T)panel;
     }
 
     /// <summary>
-    /// 关闭UI面板
+    /// 隐藏指定的UI面板实例
     /// </summary>
-    /// <typeparam name="T">面板类型</typeparam>
+    /// <param name="panel">要隐藏的面板</param>
     /// <param name="destroy">是否强制销毁面板，默认false（回收到对象池）</param>
-    public async UniTask ClosePanel<T>(bool destroy = false) where T : UIPanelBase
+    public async UniTask HidePanel(UIPanelBase panel, bool destroy = false)
     {
-        string panelName = typeof(T).Name;
-
-        // 查找第一个匹配类型的面板
-        UIPanelBase targetPanel = null;
-        foreach (var kvp in _openedPanelDict)
-        {
-            if (kvp.Value.PanelName == panelName)
-            {
-                targetPanel = kvp.Value;
-                break;
-            }
-        }
-
-        if (targetPanel != null)
-        {
-            await ClosePanelInternal(targetPanel, destroy);
-        }
+        await HidePanelInternal(panel, destroy);
     }
 
     /// <summary>
-    /// 关闭指定的UI面板实例
+    /// 内部隐藏面板逻辑
     /// </summary>
-    /// <param name="panel">要关闭的面板</param>
-    /// <param name="destroy">是否强制销毁面板，默认false（回收到对象池）</param>
-    public async UniTask ClosePanel(UIPanelBase panel, bool destroy = false)
-    {
-        await ClosePanelInternal(panel, destroy);
-    }
-
-    /// <summary>
-    /// 内部关闭面板逻辑
-    /// </summary>
-    /// <param name="panel">要关闭的面板</param>
+    /// <param name="panel">要隐藏的面板</param>
     /// <param name="destroy">是否强制销毁面板</param>
-    private async UniTask ClosePanelInternal(UIPanelBase panel, bool destroy)
+    private async UniTask HidePanelInternal(UIPanelBase panel, bool destroy)
     {
-        if (panel == null) return;
-
-        // 如果正在播放动画，则忽略重复操作
-        if (_isPlayingAnim)
+        if (!panel) return;
+        if (_hidingPanels.Contains(panel.UniqueId))
         {
-            Debug.Log($"正在播放UI动画，忽略关闭面板请求: {panel.PanelName}");
+            Debug.Log($"面板已在隐藏过程中，忽略重复隐藏请求: {panel.PanelName}({panel.UniqueId})");
             return;
         }
+        if (!_openedPanelDict.ContainsKey(panel.UniqueId))
+        {
+            Debug.Log($"面板已隐藏，忽略重复隐藏请求: {panel.PanelName}({panel.UniqueId})");
+            return;
+        }
+        if (_isPlayingAnim)
+        {
+            Debug.Log($"正在播放UI动画，忽略隐藏面板请求: {panel.PanelName}");
+            return;
+        }
+        // 标记面板为正在隐藏状态
+        _hidingPanels.Add(panel.UniqueId);
 
         // 获取面板配置信息（用于获取动画类型）
         string panelName = panel.PanelName;
@@ -390,7 +407,7 @@ public class UIMgr : MonoSingleton<UIMgr>
 
         if (_panelConfigs.TryGetValue(panelName, out var config))
         {
-            animType = config.AnimType;
+            animType = config.animType;
         }
 
         // 播放关闭音效
@@ -402,7 +419,7 @@ public class UIMgr : MonoSingleton<UIMgr>
             _uiStack.Pop();
         }
 
-        // 播放关闭动画
+        // 播放隐藏动画
         await PlayPanelAnimation(panel, animType, false);
 
         // 隐藏面板（这会自动从_openedPanelDict中移除）
@@ -421,6 +438,9 @@ public class UIMgr : MonoSingleton<UIMgr>
             // 默认回收到对象池
             RecycleToUIPool(panel.gameObject, panelName);
         }
+
+        // 移除隐藏标记
+        _hidingPanels.Remove(panel.UniqueId);
     }
 
     /// <summary>
@@ -428,111 +448,49 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// </summary>
     public async UniTask GoBack()
     {
-        if (_uiStack.Count <= 0) return;
-
-        // 如果正在播放动画，则忽略重复操作
+        if (_isGoingBack)
+        {
+            Debug.Log("正在执行返回操作，忽略重复的GoBack请求");
+            return;
+        }
+        if (_uiStack.Count <= 0)
+        {
+            Debug.Log("UI栈为空，无法执行返回操作");
+            return;
+        }
         if (_isPlayingAnim)
         {
             Debug.Log("正在播放UI动画，忽略返回操作");
             return;
         }
+        // 标记正在执行GoBack操作
+        _isGoingBack = true;
 
-        var currentPanel = _uiStack.Pop();
-        await ClosePanel(currentPanel);
-
-        // 显示栈顶的面板（如果存在）
-        if (_uiStack.Count > 0)
+        try
         {
-            var topPanel = _uiStack.Peek();
+            // 再次检查栈状态（防止在等待期间栈被修改）
+            if (_uiStack.Count <= 0)
+            {
+                Debug.Log("UI栈在执行过程中变为空，取消返回操作");
+                return;
+            }
 
-            // 重新显示栈顶面板
-            _openedPanelDict[topPanel.UniqueId] = topPanel;
-            topPanel.gameObject.SetActive(true);
-            topPanel.Show();
+            var currentPanel = _uiStack.Peek();
 
-            Debug.Log($"返回到面板 {topPanel.PanelName}({topPanel.UniqueId})");
+            // 检查面板是否已经在隐藏过程中
+            if (_hidingPanels.Contains(currentPanel.UniqueId))
+            {
+                Debug.Log($"面板已在隐藏过程中，取消返回操作: {currentPanel.PanelName}");
+                return;
+            }
+
+            await HidePanel(currentPanel);
         }
-    }
-
-    /// <summary>
-    /// 创建面板实例
-    /// </summary>
-    private async UniTask<UIPanelBase> CreatePanelInstance<T>(UILayerType layer, bool fullscreen) where T : UIPanelBase
-    {
-        // 加载并缓存预制体
-        var prefab = await LoadAndCachePrefab<T>();
-        if (prefab == null)
+        finally
         {
-            Debug.LogError($"加载UI预制体失败: {typeof(T).Name}");
-            return null;
+            // 确保在任何情况下都清除GoBack标记
+            _isGoingBack = false;
         }
-
-        // 创建新实例（所有面板都使用对象池）
-        var pool = GetOrCreateUIPool<T>(prefab);
-        var panelGo = pool.Get();
-
-        // 设置父对象和位置
-        var layerTrans = _layerDict[layer];
-        panelGo.transform.SetParent(layerTrans, false);
-
-        // 设置RectTransform
-        var rectTrans = panelGo.GetComponent<RectTransform>();
-
-        // 根据Fullscreen属性决定是否铺满
-        if (fullscreen)
-        {
-            // 铺满整个父容器
-            rectTrans.anchorMin = Vector2.zero;
-            rectTrans.anchorMax = Vector2.one;
-            rectTrans.offsetMin = Vector2.zero;
-            rectTrans.offsetMax = Vector2.zero;
-        }
-
-        // 统一设置缩放
-        rectTrans.localScale = Vector3.one;
-
-        // 获取或添加面板组件
-        var panel = panelGo.GetComponent<T>();
-        if (panel == null)
-        {
-            panel = panelGo.AddComponent<T>();
-        }
-
-        // 初始化面板
-        panel.Init(this);
-
-        return panel;
-    }
-
-    /// <summary>
-    /// 加载并缓存UI预制体
-    /// </summary>
-    /// <returns>预制体GameObject</returns>
-    private async UniTask<GameObject> LoadAndCachePrefab<T>()
-    {
-        string prefabPath = typeof(T).Name;
-        string uiPanelPath = ResMgr.Instance.Settings.UIPanelPath;
-        if (!string.IsNullOrEmpty(uiPanelPath))
-        {
-            prefabPath = $"{uiPanelPath}/{prefabPath}";
-        }
-
-        // 检查缓存
-        if (_uiPrefabCache.TryGetValue(prefabPath, out var cachedPrefab))
-        {
-            return cachedPrefab;
-        }
-
-        // 加载预制体
-        var prefab = await ResMgr.Instance.LoadAssetAsync<GameObject>(prefabPath);
-
-        // 缓存预制体（所有预制体都缓存）
-        if (prefab != null)
-        {
-            _uiPrefabCache[prefabPath] = prefab;
-        }
-
-        return prefab;
     }
     #endregion
 
@@ -546,15 +504,13 @@ public class UIMgr : MonoSingleton<UIMgr>
 
         _isPlayingAnim = true;
         var canvasGroup = panel.gameObject.GetComponent<CanvasGroup>();
-        if (canvasGroup == null)
+        if (!canvasGroup)
         {
             canvasGroup = panel.gameObject.AddComponent<CanvasGroup>();
         }
 
         var rect = panel.GetComponent<RectTransform>();
         var originalPos = rect.localPosition;
-        var originalScale = rect.localScale;
-        float originalAlpha = canvasGroup.alpha;
 
         // 设置初始状态
         if (isOpen)
@@ -581,33 +537,47 @@ public class UIMgr : MonoSingleton<UIMgr>
                     break;
             }
         }
+        else
+        {
+            switch (animType)
+            {
+                case UIPanelAnimType.SlideFromTop:
+                    originalPos = new Vector3(0, Screen.height, 0);
+                    break;
+                case UIPanelAnimType.SlideFromBottom:
+                    originalPos = new Vector3(0, -Screen.height, 0);
+                    break;
+                case UIPanelAnimType.SlideFromLeft:
+                    originalPos = new Vector3(-Screen.width, 0, 0);
+                    break;
+                case UIPanelAnimType.SlideFromRight:
+                    originalPos = new Vector3(Screen.width, 0, 0);
+                    break;
+            }
+        }
 
         // 动画时间
-        var duration = 0.3f;
+        const float duration = 0.3f;
 
         // 根据动画类型执行不同的动画
         switch (animType)
         {
             case UIPanelAnimType.Fade:
-                float fromAlpha = isOpen ? 0 : 1;
                 float toAlpha = isOpen ? 1 : 0;
-                await Tween.Custom(fromAlpha, toAlpha, duration,
-                    onValueChange: value => canvasGroup.alpha = value).ToYieldInstruction();
+                await Tween.Alpha(canvasGroup, toAlpha, duration);
                 break;
 
             case UIPanelAnimType.Scale:
-                var fromScale = isOpen ? Vector3.zero : Vector3.one;
                 var toScale = isOpen ? Vector3.one : Vector3.zero;
-                await Tween.Scale(rect, toScale, duration).ToYieldInstruction();
+                await Tween.Scale(rect, toScale, duration);
                 break;
 
             case UIPanelAnimType.SlideFromTop:
             case UIPanelAnimType.SlideFromBottom:
             case UIPanelAnimType.SlideFromLeft:
             case UIPanelAnimType.SlideFromRight:
-                var fromPos = isOpen ? rect.localPosition : Vector3.zero;
                 var toPos = isOpen ? Vector3.zero : originalPos;
-                await Tween.LocalPosition(rect, toPos, duration).ToYieldInstruction();
+                await Tween.LocalPosition(rect, toPos, duration);
                 break;
         }
 
@@ -615,36 +585,102 @@ public class UIMgr : MonoSingleton<UIMgr>
     }
 
     /// <summary>
-    /// 创建面板背景遮罩（使用统一对象池）
+    /// 初始化遮罩预制体
+    /// </summary>
+    private void InitMaskPrefab()
+    {
+        // 创建遮罩对象池，使用代码创建的遮罩对象
+        bool success = PoolMgr.Instance.GetOrCreatePool<GameObject>(
+            poolName: nameof(UIMaskPanel),
+            createFunc: CreateMaskObject,
+            actionOnGet: OnGetFromUIPool,
+            actionOnRelease: OnReleaseToUIPool,
+            actionOnDestroy: OnDestroyUIPooledObject,
+            defaultCapacity: 1,
+            maxSize: 100
+        );
+
+        if (!success)
+        {
+            Debug.LogError("创建遮罩对象池失败");
+        }
+    }
+
+    /// <summary>
+    /// 创建遮罩对象
+    /// </summary>
+    private GameObject CreateMaskObject()
+    {
+        // 创建遮罩GameObject
+        var maskObj = new GameObject("UIMaskPanel");
+
+        // 添加RectTransform组件
+        var rectTransform = maskObj.AddComponent<RectTransform>();
+
+        // 设置为UI Canvas的子对象（临时设置，后续会重新设置父对象）
+        rectTransform.SetParent(transform, false);
+
+        // 设置RectTransform属性，铺满整个父容器
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.one;
+        rectTransform.offsetMin = Vector2.zero;
+        rectTransform.offsetMax = Vector2.zero;
+        rectTransform.localScale = Vector3.one;
+
+        // 添加Image组件作为遮罩背景
+        var image = maskObj.AddComponent<Image>();
+        image.color = new Color(0f, 0f, 0f, 0.5f); // 半透明黑色遮罩
+        image.raycastTarget = true;                // 允许接收射线检测
+
+        // 添加Button组件用于点击事件
+        var button = maskObj.AddComponent<Button>();
+        button.transition = Selectable.Transition.None; // 不需要按钮过渡效果
+
+        // 添加UIMaskPanel脚本组件
+        maskObj.AddComponent<UIMaskPanel>();
+
+        // 初始状态设为非活跃
+        maskObj.SetActive(false);
+
+        return maskObj;
+    }
+
+    /// <summary>
+    /// 创建面板背景遮罩
     /// </summary>
     private void CreatePanelMask(UIPanelBase panel, bool closeByOutside)
     {
         if (panel == null) return;
 
-        // 从统一对象池获取遮罩
-        var maskObj = GetFromUIPool<UIMaskPanel>();
-        if (maskObj == null)
+        // 从遮罩对象池获取遮罩
+        var maskObj = PoolMgr.Instance.GetFromPool<GameObject>(nameof(UIMaskPanel));
+        if (!maskObj)
         {
             Debug.LogError("无法从对象池获取遮罩对象，请确保已初始化遮罩预制体");
             return;
         }
 
-        // 获取UIMask组件
+        // 获取UIMaskPanel组件
         var maskPanel = maskObj.GetComponent<UIMaskPanel>();
-        if (maskPanel == null)
+        if (!maskPanel)
         {
-            Debug.LogError("遮罩对象缺少UIMask组件");
+            Debug.LogError("遮罩对象缺少UIMaskPanel组件");
             return;
         }
 
-        maskObj.name = "Mask_" + panel.PanelName;
-
-        // 初始化遮罩面板
-        maskPanel.Init(this);
+        maskObj.name = "Mask_" + panel.UniqueId;
 
         // 设置父对象为面板所在层的父对象
         maskObj.transform.SetParent(panel.transform.parent, false);
-        maskObj.transform.SetSiblingIndex(panel.transform.GetSiblingIndex());
+        int panelIndex = panel.transform.GetSiblingIndex();
+        if (panelIndex > maskObj.transform.GetSiblingIndex())
+        {
+            maskObj.transform.SetSiblingIndex(panelIndex - 1);
+        }
+        else
+        {
+            maskObj.transform.SetSiblingIndex(panelIndex);
+        }
 
         // 设置铺满
         var rectTrans = maskObj.GetComponent<RectTransform>();
@@ -657,17 +693,18 @@ public class UIMgr : MonoSingleton<UIMgr>
         if (closeByOutside)
         {
             var btn = maskObj.GetComponent<Button>();
-            btn.onClick.AddListener(() => ClosePanel(panel).Forget());
+            // 使用一次性事件监听，避免重复触发
+            btn.onClick.AddListener(() =>
+            {
+                if (!_hidingPanels.Contains(panel.UniqueId))
+                {
+                    HidePanel(panel).Forget();
+                }
+            });
         }
-
-        // 确保遮罩在面板之前（下方）显示
-        maskObj.transform.SetAsFirstSibling();
 
         // 显示遮罩
         maskPanel.Show();
-
-        // 将遮罩加入UI栈管理（所有面板都加入栈）
-        _uiStack.Push(maskPanel);
     }
 
     /// <summary>
@@ -675,36 +712,29 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// </summary>
     private void RemovePanelMask(UIPanelBase panel)
     {
-        if (panel == null) return;
+        if (!panel) return;
 
-        string maskName = "Mask_" + panel.PanelName;
+        string maskName = "Mask_" + panel.UniqueId;
         var parent = panel.transform.parent;
 
-        if (parent != null)
+        if (!parent) return;
+
+        for (var i = 0; i < parent.childCount; i++)
         {
-            for (var i = 0; i < parent.childCount; i++)
+            var child = parent.GetChild(i);
+
+            if (child.name != maskName) continue;
+
+            var maskPanel = child.GetComponent<UIMaskPanel>();
+            if (maskPanel)
             {
-                var child = parent.GetChild(i);
-                if (child.name == maskName)
-                {
-                    var maskPanel = child.GetComponent<UIMaskPanel>();
-                    if (maskPanel != null)
-                    {
-                        // 从UI栈中移除遮罩
-                        if (_uiStack.Count > 0 && _uiStack.Peek() == maskPanel)
-                        {
-                            _uiStack.Pop();
-                        }
-
-                        // 隐藏遮罩
-                        maskPanel.Hide();
-                    }
-
-                    // 回收到统一对象池
-                    RecycleToUIPool(child.gameObject, nameof(UIMaskPanel));
-                    break;
-                }
+                // 直接隐藏并清理资源，不触发面板隐藏流程
+                maskPanel.Hide();
             }
+
+            // 回收到遮罩对象池
+            RecycleToUIPool(child.gameObject, nameof(UIMaskPanel));
+            break;
         }
     }
     #endregion
@@ -713,12 +743,10 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// <summary>
     /// 获取或创建UI对象池
     /// </summary>
-    private ObjectPool<GameObject> GetOrCreateUIPool<T>(GameObject prefab) where T : UIPanelBase
+    private bool GetOrCreateUIPool<T>(GameObject prefab) where T : UIPanelBase
     {
-        string panelName = typeof(T).Name;
-
         return PoolMgr.Instance.GetOrCreatePool<GameObject>(
-            poolName: panelName,
+            poolName: typeof(T).Name,
             createFunc: () => CreateUIPooledObject(prefab),
             actionOnGet: OnGetFromUIPool,
             actionOnRelease: OnReleaseToUIPool,
@@ -733,7 +761,7 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// </summary>
     private GameObject CreateUIPooledObject(GameObject prefab)
     {
-        var obj = Instantiate(prefab, transform, true);
+        var obj = Instantiate(prefab, transform, worldPositionStays: false);
         obj.SetActive(false);
         return obj;
     }
@@ -743,10 +771,8 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// </summary>
     private void OnGetFromUIPool(GameObject obj)
     {
-        if (obj != null)
-        {
-            obj.SetActive(true);
-        }
+        if (!obj) return;
+        obj.SetActive(true);
     }
 
     /// <summary>
@@ -754,10 +780,8 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// </summary>
     private void OnReleaseToUIPool(GameObject obj)
     {
-        if (obj != null)
-        {
-            obj.SetActive(false);
-        }
+        if (!obj) return;
+        obj.SetActive(false);
     }
 
     /// <summary>
@@ -765,10 +789,8 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// </summary>
     private void OnDestroyUIPooledObject(GameObject obj)
     {
-        if (obj != null)
-        {
-            Destroy(obj);
-        }
+        if (!obj) return;
+        Destroy(obj);
     }
 
     /// <summary>
@@ -785,7 +807,7 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// </summary>
     private void RecycleToUIPool(GameObject obj, string panelName)
     {
-        if (obj == null) return;
+        if (!obj) return;
         PoolMgr.Instance.RecycleToPool<GameObject>(obj, panelName);
     }
 
@@ -800,12 +822,9 @@ public class UIMgr : MonoSingleton<UIMgr>
     /// <summary>
     /// 从正在显示的面板字典中移除面板
     /// </summary>
-    internal void RemoveFromOpenedPanels(UIPanelBase panel)
+    internal bool RemoveFromOpenedPanels(UIPanelBase panel)
     {
-        if (panel != null && _openedPanelDict.Remove(panel.UniqueId))
-        {
-            Debug.Log($"面板 {panel.PanelName}({panel.UniqueId}) 已从显示列表中移除");
-        }
+        return panel && _openedPanelDict.Remove(panel.UniqueId);
     }
 
     /// <summary>
@@ -823,61 +842,11 @@ public class UIMgr : MonoSingleton<UIMgr>
     }
 
     /// <summary>
-    /// 获取指定类型的所有正在显示的面板
-    /// </summary>
-    public T[] GetAllPanels<T>() where T : UIPanelBase
-    {
-        string panelName = typeof(T).Name;
-        var matchingPanels = new List<T>();
-
-        foreach (var kvp in _openedPanelDict)
-        {
-            if (kvp.Value.PanelName == panelName)
-            {
-                matchingPanels.Add(kvp.Value as T);
-            }
-        }
-
-        return matchingPanels.ToArray();
-    }
-
-    /// <summary>
     /// 获取正在显示的面板数量
     /// </summary>
     public int GetOpenedPanelCount()
     {
         return _openedPanelDict.Count;
-    }
-
-    /// <summary>
-    /// 获取指定类型正在显示的面板数量
-    /// </summary>
-    public int GetOpenedPanelCount<T>() where T : UIPanelBase
-    {
-        string panelName = typeof(T).Name;
-        var count = 0;
-
-        foreach (var kvp in _openedPanelDict)
-        {
-            if (kvp.Value.PanelName == panelName)
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    /// <summary>
-    /// 关闭所有指定类型的面板
-    /// </summary>
-    public async UniTask CloseAllPanels<T>(bool destroy = false) where T : UIPanelBase
-    {
-        var panels = GetAllPanels<T>();
-        foreach (var panel in panels)
-        {
-            await ClosePanel(panel, destroy);
-        }
     }
     #endregion
 
@@ -897,6 +866,8 @@ public class UIMgr : MonoSingleton<UIMgr>
 
         _openedPanelDict.Clear();
         _uiStack.Clear();
+        _hidingPanels.Clear();
+        _isGoingBack = false;
     }
 
     /// <summary>
@@ -919,25 +890,6 @@ public class UIMgr : MonoSingleton<UIMgr>
     }
 
     /// <summary>
-    /// 检查面板是否打开
-    /// </summary>
-    public bool IsPanelOpen<T>() where T : UIPanelBase
-    {
-        string panelName = typeof(T).Name;
-
-        // 查找是否有匹配类型的面板在显示
-        foreach (var kvp in _openedPanelDict)
-        {
-            if (kvp.Value.PanelName == panelName)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
     /// 刷新面板
     /// </summary>
     public void RefreshPanel<T>(object args = null) where T : UIPanelBase
@@ -950,63 +902,14 @@ public class UIMgr : MonoSingleton<UIMgr>
     }
 
     /// <summary>
-    /// 刷新所有指定类型的面板
-    /// </summary>
-    public void RefreshAllPanels<T>(object args = null) where T : UIPanelBase
-    {
-        string panelName = typeof(T).Name;
-
-        foreach (var kvp in _openedPanelDict)
-        {
-            if (kvp.Value.PanelName == panelName)
-            {
-                kvp.Value.Refresh(args);
-            }
-        }
-    }
-
-    /// <summary>
-    /// 隐藏所有UI
-    /// </summary>
-    public void HideAllUI()
-    {
-        foreach (var panel in _openedPanelDict.Values)
-        {
-            panel.Hide();
-        }
-    }
-
-    /// <summary>
-    /// 显示所有UI
-    /// </summary>
-    public void ShowAllUI()
-    {
-        foreach (var panel in _openedPanelDict.Values)
-        {
-            panel.Show();
-        }
-    }
-
-    /// <summary>
     /// 获取面板配置信息
     /// </summary>
     /// <typeparam name="T">面板类型</typeparam>
     /// <returns>面板配置信息，如果未注册则返回null</returns>
-    public UIPanelInfo GetPanelInfo<T>() where T : UIPanelBase
+    public UIPanelInfo? GetPanelInfo<T>() where T : UIPanelBase
     {
         string panelName = typeof(T).Name;
-        return _panelConfigs.GetValueOrDefault(panelName, null);
-    }
-
-    /// <summary>
-    /// 检查面板是否已注册
-    /// </summary>
-    /// <typeparam name="T">面板类型</typeparam>
-    /// <returns>是否已注册</returns>
-    public bool IsPanelRegistered<T>() where T : UIPanelBase
-    {
-        string panelName = typeof(T).Name;
-        return _panelConfigs.ContainsKey(panelName);
+        return _panelConfigs.TryGetValue(panelName, out var config) ? config : null;
     }
 
     /// <summary>

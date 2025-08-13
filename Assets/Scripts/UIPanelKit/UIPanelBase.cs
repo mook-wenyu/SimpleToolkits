@@ -61,7 +61,7 @@ public abstract class UIPanelBase : MonoBehaviour
     public virtual void Hide(bool destroy = false)
     {
         // 通过UI管理器处理面板关闭
-        uiMgr.ClosePanel(this, destroy).Forget();
+        uiMgr.HidePanel(this, destroy).Forget();
     }
 
     /// <summary>
@@ -73,9 +73,9 @@ public abstract class UIPanelBase : MonoBehaviour
         mStateType = UIPanelStateType.Hidden;
 
         // 从正在显示的面板字典中移除
-        if (uiMgr != null)
+        if (uiMgr)
         {
-            uiMgr.RemoveFromOpenedPanels(this);
+            _ = uiMgr.RemoveFromOpenedPanels(this);
         }
 
         OnHide();

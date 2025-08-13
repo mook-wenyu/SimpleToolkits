@@ -17,7 +17,7 @@ public class Test : MonoBehaviour
 
     private async UniTaskVoid Init()
     {
-        await ResMgr.Instance.Init();
+        await ResMgr.Init();
         ConfigMgr.Init();
         await UIMgr.Instance.Init();
         
@@ -34,6 +34,13 @@ public class Test : MonoBehaviour
         Debug.Log(sb.ToString());
         
         img = GameObject.Find("Image").GetComponent<Image>();
-        img.sprite = await ResMgr.Instance.LoadAssetAsync<Sprite>("test");
+        img.sprite = await ResMgr.LoadAssetAsync<Sprite>("test");
+
+        await UIMgr.Instance.RegisterPanel<UIConfirmPanel>(UILayerType.Popup, true, true);
+
+        //await UIMgr.Instance.OpenPanel<UIConfirmPanel>();
+        //await UIMgr.Instance.OpenPanel<UIConfirmPanel>();
+        //await UIMgr.Instance.OpenPanel<UIConfirmPanel>();
     }
 }
+ 

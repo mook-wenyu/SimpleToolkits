@@ -47,6 +47,8 @@ public class SimpleToolkitSettingsInspector : Editor
             
             // YooAsset 设置
             EditorGUILayout.LabelField("YooAsset 设置", EditorStyles.boldLabel);
+            
+            EditorGUILayout.HelpBox("使用 YooAsset 需要将该分组 Asset Tags 改为 JsonConfigs", MessageType.Info);
 
             // YooAsset 运行模式
             EditorGUILayout.PropertyField(_gamePlayModeProp, new GUIContent("Game Play Mode", "YooAsset 运行模式"));
@@ -62,9 +64,6 @@ public class SimpleToolkitSettingsInspector : Editor
                 RefreshPackageInfos(settings);
             }
             
-            EditorGUILayout.Space();
-            
-            EditorGUILayout.HelpBox("使用 YooAsset 需要将该分组 Asset Tags 改为 JsonConfigs", MessageType.Info);
         }
 
         EditorGUILayout.Space();

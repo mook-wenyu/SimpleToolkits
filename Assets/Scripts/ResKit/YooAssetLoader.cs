@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.U2D;
@@ -11,9 +10,9 @@ using Object = UnityEngine.Object;
 /// YooAsset资源加载器
 /// 采用"即时卸载"策略：使用using语句自动管理AssetHandle生命周期，使用字典缓存管理
 /// </summary>
-public class YooAssetLoader : IResLoader
+public class YooAssetLoader : IResLoader, IDisposable
 {
-    private readonly Dictionary<string, Object> _assetCache = new();
+    private readonly Dictionary<string, Object> _assetCache;
 
     /// <summary>
     /// 获取运行模式。
@@ -24,6 +23,8 @@ public class YooAssetLoader : IResLoader
 
     public YooAssetLoader(EPlayMode gamePlayMode)
     {
+        _assetCache = new Dictionary<string, Object>();
+
         playMode = gamePlayMode;
 
         #if UNITY_EDITOR
@@ -37,7 +38,7 @@ public class YooAssetLoader : IResLoader
         YooAssets.SetOperationSystemMaxTimeSlice(30);
         // YooAssets.SetCacheSystemCachedFileVerifyLevel(EVerifyLevel.High);
         // YooAssets.SetDownloadSystemBreakpointResumeFileSize(4096 * 8);
-        
+
         Debug.Log($"资源系统运行模式：{playMode}\nYooAsset 资源加载器，初始化完成！");
     }
 
@@ -341,7 +342,7 @@ public class YooAssetLoader : IResLoader
                 }
             }
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             Debug.LogError($"Error loading assets from location '{location}': {ex.Message}");
         }
@@ -360,7 +361,7 @@ public class YooAssetLoader : IResLoader
         return _assetCache.Count;
     }
 
-    public void ReleaseAsset(Object asset)
+    public void Release(Object asset)
     {
         if (asset == null) return;
 
@@ -380,8 +381,13 @@ public class YooAssetLoader : IResLoader
         }
     }
 
-    public void ReleaseAllAssets()
+    public void UnloadAllAssetsAsync()
     {
         _assetCache.Clear();
+    }
+
+    public void Dispose()
+    {
+        UnloadAllAssetsAsync();
     }
 }

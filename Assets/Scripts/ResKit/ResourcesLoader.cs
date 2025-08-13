@@ -9,12 +9,14 @@ using Object = UnityEngine.Object;
 /// Unity Resources资源加载器
 /// 采用"即时卸载"策略：加载资源后立即从Resources系统卸载，使用字典缓存管理
 /// </summary>
-public class ResourcesLoader : IResLoader
+public class ResourcesLoader : IResLoader, IDisposable
 {
-    private readonly Dictionary<string, Object> _assetCache = new();
+    private readonly Dictionary<string, Object> _assetCache;
 
     public ResourcesLoader()
     {
+        _assetCache = new Dictionary<string, Object>();
+        
         Debug.Log("Unity Resources 资源加载器，初始化完成！");
     }
 
@@ -129,7 +131,7 @@ public class ResourcesLoader : IResLoader
         return _assetCache.Count;
     }
 
-    public void ReleaseAsset(Object asset)
+    public void Release(Object asset)
     {
         if (asset == null) return;
 
@@ -149,10 +151,15 @@ public class ResourcesLoader : IResLoader
         }
     }
 
-    public void ReleaseAllAssets()
+    public void UnloadAllAssetsAsync()
     {
         _assetCache.Clear();
         // 可选择性调用UnloadUnusedAssets清理
         Resources.UnloadUnusedAssets();
+    }
+    
+    public void Dispose()
+    {
+        UnloadAllAssetsAsync();
     }
 }

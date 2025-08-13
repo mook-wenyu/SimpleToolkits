@@ -22,7 +22,7 @@ public static class ConfigMgr
     public static void Init()
     {
         var jsonPath = "JsonConfigs";
-        var settings = ResMgr.Instance.Settings;
+        var settings = ResMgr.Settings;
         if (settings != null)
         {
             bool isResources = settings.jsonRelativePath.StartsWith("Assets/Resources/");
@@ -48,7 +48,7 @@ public static class ConfigMgr
 
     public static void LoadAllHandled(string jsonPath, Action onCompleted = null)
     {
-        ResMgr.Instance.LoadAllAssetAsync<TextAsset>(jsonPath, jsonConfigs =>
+        ResMgr.LoadAllAssetAsync<TextAsset>(jsonPath, jsonConfigs =>
         {
             foreach (var jsonConfig in jsonConfigs)
             {

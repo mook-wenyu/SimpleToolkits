@@ -38,10 +38,5 @@ public enum UIPanelAnimType
     /// <summary>
     /// 从右侧滑入
     /// </summary>
-    SlideFromRight,
-    
-    /// <summary>
-    /// 自定义动画
-    /// </summary>
-    Custom
+    SlideFromRight
 } 

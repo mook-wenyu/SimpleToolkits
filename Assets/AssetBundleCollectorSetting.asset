@@ -29,7 +29,7 @@ MonoBehaviour:
       AssetTags: UI
       ActiveRuleName: EnableGroup
       Collectors:
-      - CollectPath: Assets/GameRes/UI
+      - CollectPath: Assets/Resources/UI
         CollectorGUID: 03197eed7735577488544473b4447e91
         CollectorType: 0
         AddressRuleName: AddressByFileName

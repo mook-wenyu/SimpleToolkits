@@ -411,7 +411,7 @@ public class UIMgr : MonoSingleton<UIMgr>
         }
 
         // 播放关闭音效
-        AudioMgr.Instance.PlaySound("UI_关闭");
+        AudioMgr.Instance.PlaySound("UI_关闭").Forget();
 
         // 从UI栈中移除
         if (_uiStack.Count > 0 && _uiStack.Peek() == panel)

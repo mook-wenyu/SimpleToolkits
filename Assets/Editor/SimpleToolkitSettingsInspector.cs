@@ -11,9 +11,11 @@ public class SimpleToolkitSettingsInspector : Editor
     private SerializedProperty _loaderTypeProp;
     private SerializedProperty _gamePlayModeProp;
     private SerializedProperty _yooPackageInfosProp;
-    private SerializedProperty _csRelativePathProp;
-    private SerializedProperty _jsonRelativePathProp;
+    private SerializedProperty _supportedLanguagesProp;
+    private SerializedProperty _csOutputPathProp;
+    private SerializedProperty _jsonOutputPathProp;
     private SerializedProperty _uiPanelPathProp;
+    private SerializedProperty _audioPathProp;
 
     private void OnEnable()
     {
@@ -21,9 +23,11 @@ public class SimpleToolkitSettingsInspector : Editor
         _loaderTypeProp = serializedObject.FindProperty("loaderType");
         _gamePlayModeProp = serializedObject.FindProperty("gamePlayMode");
         _yooPackageInfosProp = serializedObject.FindProperty("yooPackageInfos");
-        _csRelativePathProp = serializedObject.FindProperty("csRelativePath");
-        _jsonRelativePathProp = serializedObject.FindProperty("jsonRelativePath");
+        _supportedLanguagesProp = serializedObject.FindProperty("supportedLanguages");
+        _csOutputPathProp = serializedObject.FindProperty("csOutputPath");
+        _jsonOutputPathProp = serializedObject.FindProperty("jsonOutputPath");
         _uiPanelPathProp = serializedObject.FindProperty("uiPanelPath");
+        _audioPathProp = serializedObject.FindProperty("audioPath");
     }
 
     public override void OnInspectorGUI()
@@ -34,27 +38,25 @@ public class SimpleToolkitSettingsInspector : Editor
         serializedObject.Update();
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Simple Toolkit Settings", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("简单工具包设置", EditorStyles.boldLabel);
         EditorGUILayout.Space();
 
         // 资源加载器类型
-        EditorGUILayout.PropertyField(_loaderTypeProp, new GUIContent("Loader Type", "资源加载器类型"));
+        EditorGUILayout.PropertyField(_loaderTypeProp, new GUIContent("资源加载器类型"));
 
         // 条件显示：仅当 loaderType 为 YooAsset 时显示相关UI元素
         if ((LoaderType)_loaderTypeProp.enumValueIndex == LoaderType.YooAsset)
         {
             EditorGUILayout.Space();
-            
+
             // YooAsset 设置
             EditorGUILayout.LabelField("YooAsset 设置", EditorStyles.boldLabel);
-            
-            EditorGUILayout.HelpBox("使用 YooAsset 需要将该分组 Asset Tags 改为 JsonConfigs", MessageType.Info);
 
             // YooAsset 运行模式
-            EditorGUILayout.PropertyField(_gamePlayModeProp, new GUIContent("Game Play Mode", "YooAsset 运行模式"));
+            EditorGUILayout.PropertyField(_gamePlayModeProp, new GUIContent("YooAsset 运行模式"));
 
             // YooAsset 资源包信息
-            EditorGUILayout.PropertyField(_yooPackageInfosProp, new GUIContent("YooAsset Package Infos", "YooAsset 资源包信息"), true);
+            EditorGUILayout.PropertyField(_yooPackageInfosProp, new GUIContent("YooAsset 资源包信息"), true);
 
             EditorGUILayout.Space();
 
@@ -63,44 +65,47 @@ public class SimpleToolkitSettingsInspector : Editor
             {
                 RefreshPackageInfos(settings);
             }
-            
+
         }
+
+        EditorGUILayout.Space();
+        // 本地化设置
+        EditorGUILayout.LabelField("本地化设置", EditorStyles.boldLabel);
+
+        // 支持的语言列表
+        EditorGUILayout.PropertyField(_supportedLanguagesProp, new GUIContent("支持的语言"), true);
+        EditorGUILayout.HelpBox("请确保语言列表中包含一种语言，否则可能无法正常显示文本", MessageType.Warning);
 
         EditorGUILayout.Space();
 
         // 配置数据路径设置
         EditorGUILayout.LabelField("配置数据路径设置", EditorStyles.boldLabel);
 
-        // CS 输出路径
-        EditorGUILayout.PropertyField(_csRelativePathProp, new GUIContent("CS Output Path", "生成 .cs 文件的路径"));
-
-        // JSON 输出路径
-        EditorGUILayout.PropertyField(_jsonRelativePathProp, new GUIContent("JSON Output Path", "生成 .json 文件的路径"));
-
-        EditorGUILayout.Space();
-        
-        // UI 面板路径设置
-        EditorGUILayout.LabelField("UI 面板路径设置", EditorStyles.boldLabel);
-        
-        // UI 面板路径
-        EditorGUILayout.PropertyField(_uiPanelPathProp, new GUIContent("UI Panel Path", "UI 面板预制体路径"));
-        EditorGUILayout.HelpBox("UI 面板预制体路径仅在使用 Resources 加载器时有效," +
-                                "YooAsset 加载器请使用 Addressable 加载", MessageType.Info);
-        
-        EditorGUILayout.Space();
-
-        // 只读信息显示
-        EditorGUILayout.LabelField("只读信息", EditorStyles.boldLabel);
         using (new EditorGUI.DisabledScope(true))
         {
-            EditorGUILayout.TextField("Excel File Path", settings.ExcelRelativePath);
-            EditorGUILayout.TextField("CS File Path", settings.CsRelativePath);
-            EditorGUILayout.TextField("JSON File Path", settings.JsonRelativePath);
-            EditorGUILayout.TextField("UI Panel Path", settings.UIPanelPath);
+            EditorGUILayout.TextField("Excel 文件路径", settings.ExcelFilePath);
         }
+        // CS 输出路径
+        EditorGUILayout.PropertyField(_csOutputPathProp, new GUIContent("CS 文件路径", "生成 .cs 文件的路径"));
+        // JSON 输出路径
+        EditorGUILayout.PropertyField(_jsonOutputPathProp, new GUIContent("JSON 文件路径", "生成 .json 文件的路径"));
+        EditorGUILayout.HelpBox("使用 YooAsset 需要将该分组 Asset Tags 改为 JsonConfigs", MessageType.Info);
 
         EditorGUILayout.Space();
-        
+
+        // 其他路径设置
+        EditorGUILayout.LabelField("其他路径设置", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox("仅在使用 Resources 加载器时有效," +
+                                "YooAsset 加载器请启用 Addressable 加载", MessageType.Info);
+        // UI 面板路径
+        EditorGUILayout.PropertyField(_uiPanelPathProp, new GUIContent("UI 面板路径"));
+        // 音频路径
+        EditorGUILayout.PropertyField(_audioPathProp, new GUIContent("音频路径"));
+
+        EditorGUILayout.Space();
+
+        EditorGUILayout.Space();
+
         // 应用修改的属性
         if (serializedObject.hasModifiedProperties)
         {

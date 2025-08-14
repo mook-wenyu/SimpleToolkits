@@ -25,10 +25,10 @@ public static class ConfigMgr
         var settings = ResMgr.Settings;
         if (settings != null)
         {
-            bool isResources = settings.jsonRelativePath.StartsWith("Assets/Resources/");
-            jsonPath = isResources ? settings.jsonRelativePath["Assets/Resources/".Length..] :
-                settings.jsonRelativePath;
-            
+            bool isResources = settings.LoaderType == LoaderType.Resources;
+            jsonPath = isResources ? settings.JsonOutputPath["Assets/Resources/".Length..] :
+                "JsonConfigs";
+
             LoadAllHandled(jsonPath);
         }
         {

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using YooAsset;
 using Debug = UnityEngine.Debug;
 
@@ -114,6 +115,23 @@ public static class ResMgr
     public static async UniTask<TObject> LoadAssetAsync<TObject>(string location, Action<TObject> onCompleted = null) where TObject : UnityEngine.Object
     {
         return await ResLoader.LoadAssetAsync<TObject>(location, onCompleted);
+    }
+
+    /// <summary>
+    /// 异步加载场景
+    /// </summary>
+    /// <param name="location">场景的定位地址</param>
+    /// <param name="sceneMode">场景加载模式</param>
+    /// <param name="suspendLoad">场景加载到90%自动挂起</param>
+    /// <param name="onCompleted">加载完成回调</param>
+    public static SceneHandle LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single, bool suspendLoad = false, Action<SceneHandle> onCompleted = null)
+    {
+        if (ResLoader is YooAssetLoader loader)
+        {
+            return loader.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, onCompleted);
+        }
+        Debug.LogWarning("当前资源加载器不是 YooAssetLoader，跳过场景加载");
+        return null;
     }
 
     /// <summary>

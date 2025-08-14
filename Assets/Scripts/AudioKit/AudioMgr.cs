@@ -1,21 +1,28 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Audio;
 
 public class AudioMgr : MonoSingleton<AudioMgr>
 {
     private AudioSource _musicSource; // 音乐播放器
     private AudioSource _soundSource; // 音效播放器
 
+    // private AudioMixer _audioMixer;
+
     private float _musicVolume = 1f; // 音乐音量
     private float _soundVolume = 1f; // 音效音量
-
-    // AudioClip 缓存字典
-    private readonly Dictionary<string, AudioClip> _audioClipDict = new();
     
-    public string currentMusicName;
-    public string currentSoundName;
+    /// <summary>
+    /// 当前播放的音乐
+    /// </summary>
+    public AudioClip currentMusic;
+    /// <summary>
+    /// 当前播放的音效
+    /// </summary>
+    public AudioClip currentSound;
 
     public override void OnSingletonInit()
     {
@@ -30,7 +37,7 @@ public class AudioMgr : MonoSingleton<AudioMgr>
         {
             _soundSource = gameObject.AddComponent<AudioSource>();
         }
-        
+
         // 设置音频源属性
         _musicSource.loop = true;
         _soundSource.loop = false;
@@ -45,11 +52,7 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// <param name="music"></param>
     public void PlayMusic(AudioClip music)
     {
-        if (music == null) return;
-
-        currentMusicName = music.name;
-        _audioClipDict.TryAdd(music.name, music);
-
+        if (!music) return;
         _musicSource.clip = music;
         _musicSource.Play();
     }
@@ -57,15 +60,11 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// <summary>
     /// 播放背景音乐
     /// </summary>
-    /// <param name="musicName"></param>
-    public void PlayMusic(string musicName)
+    /// <param name="musicPath"></param>
+    public async UniTaskVoid PlayMusic(string musicPath)
     {
-        AudioClip music = null;
-        if (!_audioClipDict.ContainsKey(musicName))
-        {
-            music = Resources.Load<AudioClip>("Audios/" + musicName);
-        }
-        PlayMusic(music);
+        currentMusic = await ResMgr.LoadAssetAsync<AudioClip>(musicPath);
+        PlayMusic(currentMusic);
     }
 
     /// <summary>
@@ -75,7 +74,7 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     public void SetMusicVolume(float volume = 1f)
     {
         _musicVolume = volume;
-        if (_musicSource == null) return;
+        if (!_musicSource) return;
         _musicSource.volume = volume;
     }
 
@@ -84,7 +83,7 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// </summary>
     public void PauseMusic()
     {
-        if (_musicSource == null) return;
+        if (!_musicSource) return;
         _musicSource.Pause();
     }
 
@@ -93,7 +92,7 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// </summary>
     public void ResumeMusic()
     {
-        if (_musicSource == null) return;
+        if (!_musicSource) return;
         _musicSource.UnPause();
     }
 
@@ -102,25 +101,10 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// </summary>
     public void StopMusic()
     {
-        if (_musicSource == null) return;
+        if (!_musicSource) return;
         _musicSource.Stop();
         _musicSource.clip = null;
-        currentMusicName = null;
-    }
-
-    /// <summary>
-    /// 播放音效
-    /// </summary>
-    /// <param name="sound"></param>
-    /// <param name="volume"></param>
-    public void PlaySound(AudioClip sound, float volume)
-    {
-        if (!sound) return;
-
-        currentSoundName = sound.name;
-        _audioClipDict.TryAdd(sound.name, sound);
-
-        _soundSource.PlayOneShot(sound, volume);
+        currentMusic = null;
     }
 
     /// <summary>
@@ -129,31 +113,19 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// <param name="sound"></param>
     public void PlaySound(AudioClip sound)
     {
-        _soundSource.PlayOneShot(sound, _soundVolume);
+        if (!sound) return;
+        _soundSource.clip = sound;
+        _soundSource.Play();
     }
 
     /// <summary>
     /// 播放音效
     /// </summary>
-    /// <param name="soundName"></param>
-    /// <param name="volume"></param>
-    public void PlaySound(string soundName, float volume)
+    /// <param name="soundPath"></param>
+    public async UniTaskVoid PlaySound(string soundPath)
     {
-        AudioClip sound = null;
-        if (!_audioClipDict.ContainsKey(soundName))
-        {
-            sound = Resources.Load<AudioClip>("Audios/" + soundName);
-        }
-        PlaySound(sound, volume);
-    }
-
-    /// <summary>
-    /// 播放音效
-    /// </summary>
-    /// <param name="soundName"></param>
-    public void PlaySound(string soundName)
-    {
-        PlaySound(soundName, _soundVolume);
+        currentSound = await ResMgr.LoadAssetAsync<AudioClip>(soundPath);
+        PlaySound(currentSound);
     }
 
     /// <summary>
@@ -163,19 +135,18 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     public void SetSoundVolume(float volume = 1f)
     {
         _soundVolume = volume;
-        if (_soundSource == null) return;
+        if (!_soundSource) return;
         _soundSource.volume = volume;
     }
-    
+
     /// <summary>
     /// 停止音效
     /// </summary>
     public void StopSound()
     {
-        if (_soundSource == null) return;
+        if (!_soundSource) return;
         _soundSource.Stop();
         _soundSource.clip = null;
-        currentSoundName = null;
     }
 
     protected override void OnDestroy()
@@ -184,6 +155,8 @@ public class AudioMgr : MonoSingleton<AudioMgr>
         StopSound();
         _musicSource = null;
         _soundSource = null;
+        currentMusic = null;
+        currentSound = null;
         base.OnDestroy();
     }
 }

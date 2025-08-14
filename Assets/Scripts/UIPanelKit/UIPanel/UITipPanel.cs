@@ -91,7 +91,7 @@ public class UITipPanel : UIPanelBase
         _btnClose = transform.Find("BtnClose").GetComponent<Button>();
 
         // 加载图标资源
-        LoadIcons();
+        // LoadIcons();
 
         // 添加事件监听
         _btnClose.onClick.AddListener(OnCloseClick);
@@ -116,21 +116,14 @@ public class UITipPanel : UIPanelBase
             _txtMessage.text = info.Message;
 
             // 设置图标
-            switch (info.Type)
+            /*_imgIcon.sprite = info.Type switch
             {
-                case TipType.Normal:
-                    _imgIcon.sprite = _iconNormal;
-                    break;
-                case TipType.Success:
-                    _imgIcon.sprite = _iconSuccess;
-                    break;
-                case TipType.Warning:
-                    _imgIcon.sprite = _iconWarning;
-                    break;
-                case TipType.Error:
-                    _imgIcon.sprite = _iconError;
-                    break;
-            }
+                TipType.Normal => _iconNormal,
+                TipType.Success => _iconSuccess,
+                TipType.Warning => _iconWarning,
+                TipType.Error => _iconError,
+                _ => _iconNormal
+            };*/
 
             // 设置自动关闭
             _duration = info.Duration;
@@ -145,7 +138,7 @@ public class UITipPanel : UIPanelBase
         {
             // 默认提示
             _txtMessage.text = "操作成功";
-            _imgIcon.sprite = _iconNormal;
+            // _imgIcon.sprite = _iconNormal;
             _duration = 2.0f;
             _onClose = null;
             _btnClose.gameObject.SetActive(false);

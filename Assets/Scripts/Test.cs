@@ -8,7 +8,7 @@ using UnityEngine.UI;
 
 public class Test : MonoBehaviour
 {
-    private Image img;
+    private Image _img;
 
     private void Awake()
     {
@@ -18,6 +18,8 @@ public class Test : MonoBehaviour
     private async UniTaskVoid Init()
     {
         await ResMgr.Init();
+        LocaleMgr.Init();
+        ConsoleMgr.Instance.Init();
         ConfigMgr.Init();
         await UIMgr.Instance.Init();
         
@@ -33,8 +35,8 @@ public class Test : MonoBehaviour
         }
         Debug.Log(sb.ToString());
         
-        img = GameObject.Find("Image").GetComponent<Image>();
-        img.sprite = await ResMgr.LoadAssetAsync<Sprite>("test");
+        _img = GameObject.Find("Image").GetComponent<Image>();
+        _img.sprite = await ResMgr.LoadAssetAsync<Sprite>("test");
 
         await UIMgr.Instance.RegisterPanel<UIConfirmPanel>(UILayerType.Popup, true, true);
 

@@ -41,12 +41,12 @@ public class EditorUtils
         Formatting = Formatting.Indented,
     };
 
-    [MenuItem("Simple Toolkit/Excel To Json")]
+    [MenuItem("Simple Toolkit/Excel To Json", priority = 0)]
     public static void GenerateConfigs()
     {
         DeleteAllOldFiles();
 
-        string excelDirPath = SimpleToolkitSettings.Instance.ExcelRelativePath;
+        string excelDirPath = SimpleToolkitSettings.Instance.ExcelFilePath;
         if (!Directory.Exists(excelDirPath)) Directory.CreateDirectory(excelDirPath);
 
         string[] excelFiles = Directory.EnumerateFiles(excelDirPath)
@@ -161,7 +161,7 @@ public class EditorUtils
     /// <param name="configName"></param>
     private static void GenerateConfigClass(List<PropertyInfo> properties, string configName)
     {
-        string filePath = Path.Combine(SimpleToolkitSettings.Instance.CsRelativePath, $"{configName}Config.cs");
+        string filePath = Path.Combine(SimpleToolkitSettings.Instance.CsOutputPath, $"{configName}Config.cs");
         string fileDir = Path.GetDirectoryName(filePath);
         if (string.IsNullOrEmpty(fileDir)) fileDir = Path.Combine(Application.dataPath, "Scripts", "Configs");
         if (!Directory.Exists(fileDir)) Directory.CreateDirectory(fileDir);
@@ -195,7 +195,7 @@ public class EditorUtils
     /// <param name="excelConfig"></param>
     private static void GenerateConfigJson(ExcelConfig excelConfig)
     {
-        string filePath = Path.Combine(SimpleToolkitSettings.Instance.JsonRelativePath, $"{excelConfig.ConfigName}Config.json");
+        string filePath = Path.Combine(SimpleToolkitSettings.Instance.JsonOutputPath, $"{excelConfig.ConfigName}Config.json");
         string fileDir = Path.GetDirectoryName(filePath);
         if (string.IsNullOrEmpty(fileDir)) fileDir = Path.Combine(Application.dataPath, "Resources", "JsonConfigs");
         if (!Directory.Exists(fileDir)) Directory.CreateDirectory(fileDir);
@@ -357,9 +357,9 @@ public class EditorUtils
     {
         var settings = SimpleToolkitSettings.Instance;
 
-        if (Directory.Exists(settings.CsRelativePath)) Directory.Delete(settings.CsRelativePath, true);
-        if (Directory.Exists(settings.JsonRelativePath)) Directory.Delete(settings.JsonRelativePath, true);
-        Directory.CreateDirectory(settings.CsRelativePath);
-        Directory.CreateDirectory(settings.JsonRelativePath);
+        if (Directory.Exists(settings.CsOutputPath)) Directory.Delete(settings.CsOutputPath, true);
+        if (Directory.Exists(settings.JsonOutputPath)) Directory.Delete(settings.JsonOutputPath, true);
+        Directory.CreateDirectory(settings.CsOutputPath);
+        Directory.CreateDirectory(settings.JsonOutputPath);
     }
 }

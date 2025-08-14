@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.U2D;
 using YooAsset;
 using Object = UnityEngine.Object;
@@ -235,6 +236,21 @@ public class YooAssetLoader : IResLoader, IDisposable
 
         onCompleted?.Invoke(null);
         return null;
+    }
+
+    /// <summary>
+    /// 异步加载场景
+    /// </summary>
+    /// <param name="location">场景的定位地址</param>
+    /// <param name="sceneMode">场景加载模式</param>
+    /// <param name="physicsMode">场景物理模式</param>
+    /// <param name="suspendLoad">场景加载到90%自动挂起</param>
+    /// <param name="onCompleted">加载完成回调</param>
+    public SceneHandle LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single, LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool suspendLoad = false, Action<SceneHandle> onCompleted = null)
+    {
+        var handle = YooAssets.LoadSceneAsync(location, sceneMode, physicsMode, suspendLoad);
+        onCompleted?.Invoke(handle);
+        return handle;
     }
 
     public async UniTask<T> LoadSubAssetAsync<T>(string location, string subName, Action<T> onCompleted = null) where T : Object

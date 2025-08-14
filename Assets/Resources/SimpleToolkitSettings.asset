@@ -19,6 +19,12 @@ MonoBehaviour:
     hostServerURL: 
     fallbackHostServerURL: 
     isDefaultPackage: 1
-  csRelativePath: Assets/Scripts/Configs
-  jsonRelativePath: Assets/Resources/JsonConfigs
-  uiPanelPath: Prefabs/UIPanel/
+  supportedLanguages:
+  - key: cn
+    language: 40
+  - key: en
+    language: 10
+  csOutputPath: Assets/Scripts/Configs
+  jsonOutputPath: Assets/GameRes/JsonConfigs
+  uiPanelPath: Prefabs/UIPanel
+  audioPath: Audio

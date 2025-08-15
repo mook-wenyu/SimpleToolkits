@@ -10,9 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0774ce2c44c2b7a458aa4be1a6a98f14, type: 3}
-  m_Name: SimpleToolkitSettings
+  m_Name: SimpleToolkitsSettings
   m_EditorClassIdentifier: 
-  loaderType: 1
   gamePlayMode: 1
   yooPackageInfos:
   - packageName: DefaultPackage
@@ -24,7 +23,6 @@ MonoBehaviour:
     language: 40
   - key: en
     language: 10
+  languageExcelFileName: Languages
   csOutputPath: Assets/Scripts/Configs
   jsonOutputPath: Assets/GameRes/JsonConfigs
-  uiPanelPath: Prefabs/UIPanel
-  audioPath: Audio

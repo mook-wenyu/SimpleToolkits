@@ -9,7 +9,7 @@ using YooAsset;
 /// <summary>
 /// 场景管理器
 /// </summary>
-public sealed class SceneMgr : MonoSingleton<SceneMgr>
+public class SceneBehaviour : MonoBehaviour
 {
     private sealed class SceneHandleData
     {
@@ -46,12 +46,7 @@ public sealed class SceneMgr : MonoSingleton<SceneMgr>
     /// </summary>
     private event Action<string, object> OnUnloadSceneFailure;
 
-    public void Init()
-    {
-        
-    }
-
-    protected override void OnDestroy()
+    void OnDestroy()
     {
         string[] loadedSceneAssetNames = _loadedSceneAssetNames.Keys.ToArray();
         foreach (string loadedSceneAssetName in loadedSceneAssetNames)
@@ -67,7 +62,6 @@ public sealed class SceneMgr : MonoSingleton<SceneMgr>
         _loadedSceneAssetNames.Clear();
         _loadingSceneAssetNames.Clear();
         _unloadingSceneAssetNames.Clear();
-        base.OnDestroy();
     }
 
     /// <summary>
@@ -144,32 +138,32 @@ public sealed class SceneMgr : MonoSingleton<SceneMgr>
     }
 
     /// <summary>
-    /// 加载场景
+    /// 异步加载场景
     /// </summary>
     /// <param name="sceneAssetName">场景资源名称</param>
     /// <param name="sceneMode">加载场景的方式</param>
-    public UniTask<SceneHandle> LoadScene(string sceneAssetName, LoadSceneMode sceneMode = LoadSceneMode.Single)
+    public UniTask<SceneHandle> LoadSceneAsync(string sceneAssetName, LoadSceneMode sceneMode = LoadSceneMode.Single)
     {
-        return LoadScene(sceneAssetName, sceneMode, null);
+        return LoadSceneAsync(sceneAssetName, sceneMode, null);
     }
 
     /// <summary>
-    /// 加载场景
+    /// 异步加载场景
     /// </summary>
     /// <param name="sceneAssetName">场景资源名称</param>
     /// <param name="userData">用户自定义数据</param>
-    public UniTask<SceneHandle> LoadScene(string sceneAssetName, object userData)
+    public UniTask<SceneHandle> LoadSceneAsync(string sceneAssetName, object userData)
     {
-        return LoadScene(sceneAssetName, LoadSceneMode.Single, userData);
+        return LoadSceneAsync(sceneAssetName, LoadSceneMode.Single, userData);
     }
 
     /// <summary>
-    /// 加载场景
+    /// 异步加载场景
     /// </summary>
     /// <param name="sceneAssetName">场景资源名称</param>
-    /// <param name="sceneMode"></param>
+    /// <param name="sceneMode">加载场景的方式</param>
     /// <param name="userData">用户自定义数据</param>
-    public async UniTask<SceneHandle> LoadScene(string sceneAssetName, LoadSceneMode sceneMode, object userData)
+    public async UniTask<SceneHandle> LoadSceneAsync(string sceneAssetName, LoadSceneMode sceneMode, object userData)
     {
         if (string.IsNullOrEmpty(sceneAssetName))
         {
@@ -195,8 +189,7 @@ public sealed class SceneMgr : MonoSingleton<SceneMgr>
             return null;
         }
 
-        var sceneOperationHandle = ResMgr.LoadSceneAsync(sceneAssetName, sceneMode, true);
-        await sceneOperationHandle.ToUniTask();
+        var sceneOperationHandle = Mgr.Instance.Loader.LoadSceneAsync(sceneAssetName, sceneMode, LocalPhysicsMode.None, true);
         _loadingSceneAssetNames.Add(sceneAssetName, new SceneHandleData(sceneOperationHandle, userData));
         sceneOperationHandle.Completed += OnLoadSceneCompleted;
         return sceneOperationHandle;

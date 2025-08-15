@@ -7,6 +7,13 @@ using UnityEngine;
 [Serializable]
 public struct Language
 {
-    public string key;
+    public string langKey;
     public SystemLanguage language;
+
+    public Language(string langKey, SystemLanguage language)
+    {
+        this.langKey = langKey;
+        this.language = language;
+    }
+
 }

@@ -1,18 +1,32 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using TMPro;
 using UnityEngine;
 
+[RequireComponent(typeof(TMP_Text))]
 public class LocaleText : MonoBehaviour
 {
     private TextMeshProUGUI _textMeshProUGUI;
     private TextMeshPro _textMeshPro;
 
-    public List<LanguageText> languageTexts;
+    [TextArea(0, int.MaxValue)] public string langKey;
 
-    public void SetText(string text)
+    private void Start()
+    {
+        UpdateText(langKey);
+    }
+
+    /// <summary>
+    /// 根据当前语言的语言键更新文本
+    /// </summary>
+    /// <param name="key">语言键</param>
+    public void UpdateText(string key)
+    {
+        SetText(Mgr.Instance.Locale[key]);
+    }
+
+    private void SetText(string text)
     {
         if (!_textMeshProUGUI && !_textMeshPro)
         {
@@ -29,10 +43,5 @@ public class LocaleText : MonoBehaviour
         {
             _textMeshPro.text = text;
         }
-    }
-
-    public void UpdateText(SystemLanguage language)
-    {
-        SetText(languageTexts.First(lt => lt.language == language).text);
     }
 }

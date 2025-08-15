@@ -5,34 +5,30 @@ using YooAsset.Editor;
 using System.Collections.Generic;
 using System.Linq;
 
-[CustomEditor(typeof(SimpleToolkitSettings))]
-public class SimpleToolkitSettingsInspector : Editor
+[CustomEditor(typeof(SimpleToolkitsSettings))]
+public class SimpleToolkitsSettingsInspector : Editor
 {
-    private SerializedProperty _loaderTypeProp;
     private SerializedProperty _gamePlayModeProp;
     private SerializedProperty _yooPackageInfosProp;
     private SerializedProperty _supportedLanguagesProp;
+    private SerializedProperty _languageExcelFileNameProp;
     private SerializedProperty _csOutputPathProp;
     private SerializedProperty _jsonOutputPathProp;
-    private SerializedProperty _uiPanelPathProp;
-    private SerializedProperty _audioPathProp;
 
     private void OnEnable()
     {
         // 获取序列化属性
-        _loaderTypeProp = serializedObject.FindProperty("loaderType");
         _gamePlayModeProp = serializedObject.FindProperty("gamePlayMode");
         _yooPackageInfosProp = serializedObject.FindProperty("yooPackageInfos");
         _supportedLanguagesProp = serializedObject.FindProperty("supportedLanguages");
+        _languageExcelFileNameProp = serializedObject.FindProperty("languageExcelFileName");
         _csOutputPathProp = serializedObject.FindProperty("csOutputPath");
         _jsonOutputPathProp = serializedObject.FindProperty("jsonOutputPath");
-        _uiPanelPathProp = serializedObject.FindProperty("uiPanelPath");
-        _audioPathProp = serializedObject.FindProperty("audioPath");
     }
 
     public override void OnInspectorGUI()
     {
-        var settings = (SimpleToolkitSettings)target;
+        var settings = (SimpleToolkitsSettings)target;
 
         // 更新序列化对象
         serializedObject.Update();
@@ -41,31 +37,24 @@ public class SimpleToolkitSettingsInspector : Editor
         EditorGUILayout.LabelField("简单工具包设置", EditorStyles.boldLabel);
         EditorGUILayout.Space();
 
-        // 资源加载器类型
-        EditorGUILayout.PropertyField(_loaderTypeProp, new GUIContent("资源加载器类型"));
+        EditorGUILayout.HelpBox("YooAsset 加载器请启用 Addressable 加载", MessageType.Info);
+        EditorGUILayout.Space();
 
-        // 条件显示：仅当 loaderType 为 YooAsset 时显示相关UI元素
-        if ((LoaderType)_loaderTypeProp.enumValueIndex == LoaderType.YooAsset)
+        // YooAsset 设置
+        EditorGUILayout.LabelField("YooAsset 设置", EditorStyles.boldLabel);
+
+        // YooAsset 运行模式
+        EditorGUILayout.PropertyField(_gamePlayModeProp, new GUIContent("YooAsset 运行模式"));
+
+        // YooAsset 资源包信息
+        EditorGUILayout.PropertyField(_yooPackageInfosProp, new GUIContent("YooAsset 资源包信息"), true);
+
+        EditorGUILayout.Space();
+
+        // 刷新包信息按钮
+        if (GUILayout.Button("刷新包信息", GUILayout.Height(30)))
         {
-            EditorGUILayout.Space();
-
-            // YooAsset 设置
-            EditorGUILayout.LabelField("YooAsset 设置", EditorStyles.boldLabel);
-
-            // YooAsset 运行模式
-            EditorGUILayout.PropertyField(_gamePlayModeProp, new GUIContent("YooAsset 运行模式"));
-
-            // YooAsset 资源包信息
-            EditorGUILayout.PropertyField(_yooPackageInfosProp, new GUIContent("YooAsset 资源包信息"), true);
-
-            EditorGUILayout.Space();
-
-            // 刷新包信息按钮
-            if (GUILayout.Button("刷新包信息", GUILayout.Height(30)))
-            {
-                RefreshPackageInfos(settings);
-            }
-
+            RefreshPackageInfos(settings);
         }
 
         EditorGUILayout.Space();
@@ -74,7 +63,16 @@ public class SimpleToolkitSettingsInspector : Editor
 
         // 支持的语言列表
         EditorGUILayout.PropertyField(_supportedLanguagesProp, new GUIContent("支持的语言"), true);
-        EditorGUILayout.HelpBox("请确保语言列表中包含一种语言，否则可能无法正常显示文本", MessageType.Warning);
+        EditorGUILayout.HelpBox("请确保语言列表中包含一种语言，否则可能无法正常显示文本！", MessageType.Warning);
+
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.Space();
+            // 语言配置表文件名
+            EditorGUILayout.PropertyField(_languageExcelFileNameProp, new GUIContent("语言配置表文件名"));
+            EditorGUILayout.Space();
+        }
+        EditorGUILayout.HelpBox("请确保语言配置表文件名正确，否则可能无法正常显示文本！", MessageType.Warning);
 
         EditorGUILayout.Space();
 
@@ -89,20 +87,10 @@ public class SimpleToolkitSettingsInspector : Editor
         EditorGUILayout.PropertyField(_csOutputPathProp, new GUIContent("CS 文件路径", "生成 .cs 文件的路径"));
         // JSON 输出路径
         EditorGUILayout.PropertyField(_jsonOutputPathProp, new GUIContent("JSON 文件路径", "生成 .json 文件的路径"));
-        EditorGUILayout.HelpBox("使用 YooAsset 需要将该分组 Asset Tags 改为 JsonConfigs", MessageType.Info);
+        EditorGUILayout.HelpBox("需要将该分组 Asset Tags 改为 JsonConfigs", MessageType.Info);
 
         EditorGUILayout.Space();
 
-        // 其他路径设置
-        EditorGUILayout.LabelField("其他路径设置", EditorStyles.boldLabel);
-        EditorGUILayout.HelpBox("仅在使用 Resources 加载器时有效," +
-                                "YooAsset 加载器请启用 Addressable 加载", MessageType.Info);
-        // UI 面板路径
-        EditorGUILayout.PropertyField(_uiPanelPathProp, new GUIContent("UI 面板路径"));
-        // 音频路径
-        EditorGUILayout.PropertyField(_audioPathProp, new GUIContent("音频路径"));
-
-        EditorGUILayout.Space();
 
         EditorGUILayout.Space();
 
@@ -117,7 +105,7 @@ public class SimpleToolkitSettingsInspector : Editor
     /// <summary>
     /// 刷新包信息，同步 AssetBundleCollectorSetting 和 yooPackageInfos 之间的数据
     /// </summary>
-    private void RefreshPackageInfos(SimpleToolkitSettings settings)
+    private void RefreshPackageInfos(SimpleToolkitsSettings settings)
     {
         try
         {
@@ -159,9 +147,9 @@ public class SimpleToolkitSettingsInspector : Editor
     /// <summary>
     /// 同步包信息数据
     /// </summary>
-    /// <param name="settings">SimpleToolkitSettings 实例</param>
+    /// <param name="settings">SimpleToolkitsSettings 实例</param>
     /// <param name="collectorPackageNames">从 AssetBundleCollectorSetting 获取的包名列表</param>
-    private void SyncPackageInfos(SimpleToolkitSettings settings, List<string> collectorPackageNames)
+    private void SyncPackageInfos(SimpleToolkitsSettings settings, List<string> collectorPackageNames)
     {
         settings.yooPackageInfos ??= new List<YooPackageInfo>();
 

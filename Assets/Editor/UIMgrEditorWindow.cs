@@ -15,7 +15,7 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 在Tools菜单中添加打开窗口的选项
     /// </summary>
-    [MenuItem("Simple Toolkit/UI Manager Inspector")]
+    [MenuItem("Simple Toolkits/UI Manager Inspector")]
     public static void ShowWindow()
     {
         var window = GetWindow<UIMgrEditorWindow>("UI Manager Inspector");
@@ -133,11 +133,11 @@ public class UIMgrEditorWindow : EditorWindow
     /// </summary>
     private void DrawPlayModeContent()
     {
-        var uiMgr = UIMgr.Instance;
+        var uiMgr = Mgr.Instance.UI;
 
         if (!uiMgr)
         {
-            EditorGUILayout.HelpBox("UIMgr instance not found. Make sure UIMgr is initialized in the scene.", MessageType.Warning);
+            EditorGUILayout.HelpBox("UIBehaviour instance not found. Make sure UIBehaviour is initialized in the scene.", MessageType.Warning);
             return;
         }
         
@@ -168,20 +168,20 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 绘制控制按钮
     /// </summary>
-    private void DrawControlButtons(UIMgr uiMgr)
+    private void DrawControlButtons(UIBehaviour uiBehaviour)
     {
         EditorGUILayout.BeginHorizontal();
 
         if (GUILayout.Button("Go Back", GUILayout.Width(100)))
         {
-            uiMgr.GoBack().Forget();
+            uiBehaviour.GoBack().Forget();
         }
 
-        foreach (var panel in uiMgr.GetAllPanelConfigs())
+        foreach (var panel in uiBehaviour.GetAllPanelConfigs())
         {
             if (GUILayout.Button(panel.Key, GUILayout.Width(100)))
             {
-                OpenPanelByName(uiMgr, panel.Key);
+                OpenPanelByName(uiBehaviour, panel.Key);
             }
         }
 
@@ -191,14 +191,14 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 通过面板名称动态打开UI面板
     /// </summary>
-    /// <param name="uiMgr">UI管理器实例</param>
+    /// <param name="uiBehaviour">UI管理器实例</param>
     /// <param name="panelName">面板名称</param>
-    private void OpenPanelByName(UIMgr uiMgr, string panelName)
+    private void OpenPanelByName(UIBehaviour uiBehaviour, string panelName)
     {
         try
         {
             // 通过反射查找面板类型
-            Type panelType = FindPanelType(panelName);
+            var panelType = FindPanelType(panelName);
             if (panelType == null)
             {
                 Debug.LogError($"找不到面板类型: {panelName}");
@@ -215,7 +215,7 @@ public class UIMgrEditorWindow : EditorWindow
             }
 
             // 获取UIMgr的OpenPanel<T>方法
-            MethodInfo openPanelMethod = typeof(UIMgr).GetMethod("OpenPanel", new Type[] { typeof(object) });
+            var openPanelMethod = typeof(UIBehaviour).GetMethod("OpenPanel", new[] { typeof(object) });
             if (openPanelMethod == null)
             {
                 Debug.LogError("找不到 OpenPanel 方法");
@@ -223,15 +223,15 @@ public class UIMgrEditorWindow : EditorWindow
             }
 
             // 创建泛型方法
-            MethodInfo genericOpenPanelMethod = openPanelMethod.MakeGenericMethod(panelType);
+            var genericOpenPanelMethod = openPanelMethod.MakeGenericMethod(panelType);
 
             // 调用方法
-            object result = genericOpenPanelMethod.Invoke(uiMgr, new object[] { null });
+            object result = genericOpenPanelMethod.Invoke(uiBehaviour, new object[] { null });
 
             // 如果返回的是UniTask，调用Forget()
             if (result != null && result.GetType().Name.Contains("UniTask"))
             {
-                MethodInfo forgetMethod = result.GetType().GetMethod("Forget");
+                var forgetMethod = result.GetType().GetMethod("Forget");
                 forgetMethod?.Invoke(result, null);
             }
 
@@ -254,16 +254,16 @@ public class UIMgrEditorWindow : EditorWindow
         try
         {
             // 首先尝试在当前程序集中查找
-            Assembly currentAssembly = Assembly.GetExecutingAssembly();
-            Type panelType = currentAssembly.GetType(panelName);
+            var currentAssembly = Assembly.GetExecutingAssembly();
+            var panelType = currentAssembly.GetType(panelName);
             if (panelType != null && typeof(UIPanelBase).IsAssignableFrom(panelType))
             {
                 return panelType;
             }
 
             // 在所有已加载的程序集中查找
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (Assembly assembly in assemblies)
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var assembly in assemblies)
             {
                 try
                 {
@@ -275,8 +275,8 @@ public class UIMgrEditorWindow : EditorWindow
                     }
 
                     // 尝试通过简单名称查找
-                    Type[] types = assembly.GetTypes();
-                    foreach (Type type in types)
+                    var types = assembly.GetTypes();
+                    foreach (var type in types)
                     {
                         if (type.Name == panelName && typeof(UIPanelBase).IsAssignableFrom(type))
                         {
@@ -287,12 +287,10 @@ public class UIMgrEditorWindow : EditorWindow
                 catch (ReflectionTypeLoadException)
                 {
                     // 忽略无法加载的程序集
-                    continue;
                 }
                 catch (Exception)
                 {
                     // 忽略其他异常
-                    continue;
                 }
             }
 
@@ -308,12 +306,12 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 绘制统计信息
     /// </summary>
-    private void DrawStatistics(UIMgr uiMgr)
+    private void DrawStatistics(UIBehaviour uiBehaviour)
     {
         EditorGUILayout.BeginVertical(_panelBoxStyle);
 
-        int registeredCount = uiMgr.GetAllPanelConfigs().Count;
-        int openedCount = uiMgr.GetOpenedPanelCount();
+        int registeredCount = uiBehaviour.GetAllPanelConfigs().Count;
+        int openedCount = uiBehaviour.GetOpenedPanelCount();
 
         EditorGUILayout.LabelField($"已注册的面板: {registeredCount}");
         EditorGUILayout.LabelField($"已打开的面板: {openedCount}");
@@ -324,9 +322,9 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 绘制已注册面板配置
     /// </summary>
-    private void DrawRegisteredPanels(UIMgr uiMgr)
+    private void DrawRegisteredPanels(UIBehaviour uiBehaviour)
     {
-        var configs = uiMgr.GetAllPanelConfigs();
+        var configs = uiBehaviour.GetAllPanelConfigs();
 
         if (configs.Count == 0)
         {
@@ -367,9 +365,9 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 绘制当前打开的面板
     /// </summary>
-    private void DrawOpenedPanels(UIMgr uiMgr)
+    private void DrawOpenedPanels(UIBehaviour uiBehaviour)
     {
-        var openedPanels = uiMgr.GetAllOpenedPanels();
+        var openedPanels = uiBehaviour.GetAllOpenedPanels();
 
         if (openedPanels.Length == 0)
         {
@@ -403,7 +401,7 @@ public class UIMgrEditorWindow : EditorWindow
             // 操作按钮
             if (GUILayout.Button("隐藏", GUILayout.Width(50)))
             {
-                uiMgr.HidePanel(panel).Forget();
+                uiBehaviour.HidePanel(panel).Forget();
             }
             
             if (GUILayout.Button("选择", GUILayout.Width(50)))
@@ -421,12 +419,12 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 绘制UI层级信息
     /// </summary>
-    private void DrawLayerInfo(UIMgr uiMgr)
+    private void DrawLayerInfo(UIBehaviour uiBehaviour)
     {
         EditorGUILayout.BeginVertical(_panelBoxStyle);
 
         // 显示各个UI层级的信息
-        var layerTypes = System.Enum.GetValues(typeof(UILayerType)).Cast<UILayerType>().Where(l => l != UILayerType.None);
+        var layerTypes = Enum.GetValues(typeof(UILayerType)).Cast<UILayerType>().Where(l => l != UILayerType.None);
 
         foreach (var layer in layerTypes)
         {
@@ -435,7 +433,7 @@ public class UIMgrEditorWindow : EditorWindow
             EditorGUILayout.LabelField($"层级 {layer}:", EditorStyles.boldLabel, GUILayout.Width(100));
 
             // 统计该层级的面板数量
-            int panelsInLayer = CountPanelsInLayer(uiMgr, layer);
+            int panelsInLayer = CountPanelsInLayer(uiBehaviour, layer);
 
             EditorGUILayout.LabelField($"面板数: {panelsInLayer}", GUILayout.Width(80));
 
@@ -452,12 +450,12 @@ public class UIMgrEditorWindow : EditorWindow
     /// <summary>
     /// 统计指定层级的面板数量
     /// </summary>
-    private int CountPanelsInLayer(UIMgr uiMgr, UILayerType layer)
+    private int CountPanelsInLayer(UIBehaviour uiBehaviour, UILayerType layer)
     {
         try
         {
-            var configs = uiMgr.GetAllPanelConfigs();
-            var openedPanels = uiMgr.GetAllOpenedPanels();
+            var configs = uiBehaviour.GetAllPanelConfigs();
+            var openedPanels = uiBehaviour.GetAllOpenedPanels();
 
             return openedPanels.Count(panel =>
             {
@@ -472,7 +470,7 @@ public class UIMgrEditorWindow : EditorWindow
                 return false;
             });
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             Debug.LogWarning($"统计层级 {layer} 面板数量时出错: {ex.Message}");
             return 0;
@@ -489,7 +487,7 @@ public class UIMgrEditorWindow : EditorWindow
             return;
         }
 
-        var uiMgr = UIMgr.Instance;
+        var uiMgr = Mgr.Instance.UI;
         if (!uiMgr) return;
 
         // 添加一些额外的信息
@@ -497,7 +495,7 @@ public class UIMgrEditorWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         GUILayout.FlexibleSpace();
         EditorGUILayout.LabelField($"刷新间隔: {Refresh_Interval}秒", EditorStyles.miniLabel);
-        EditorGUILayout.LabelField($"上次刷新: {System.DateTime.Now:HH:mm:ss}", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField($"上次刷新: {DateTime.Now:HH:mm:ss}", EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
     }
 }

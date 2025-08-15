@@ -63,7 +63,7 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// <param name="musicPath"></param>
     public async UniTaskVoid PlayMusic(string musicPath)
     {
-        currentMusic = await ResMgr.LoadAssetAsync<AudioClip>(musicPath);
+        currentMusic = await Mgr.Instance.Loader.LoadAssetAsync<AudioClip>(musicPath);
         PlayMusic(currentMusic);
     }
 
@@ -124,7 +124,7 @@ public class AudioMgr : MonoSingleton<AudioMgr>
     /// <param name="soundPath"></param>
     public async UniTaskVoid PlaySound(string soundPath)
     {
-        currentSound = await ResMgr.LoadAssetAsync<AudioClip>(soundPath);
+        currentSound = await Mgr.Instance.Loader.LoadAssetAsync<AudioClip>(soundPath);
         PlaySound(currentSound);
     }
 

@@ -99,10 +99,10 @@ public class UITipPanel : UIPanelBase
 
     private void LoadIcons()
     {
-        ResMgr.LoadAssetAsync<Sprite>("tip_icon_normal", sprite => _iconNormal = sprite).Forget();
-        ResMgr.LoadAssetAsync<Sprite>("tip_icon_success", sprite => _iconSuccess = sprite).Forget();
-        ResMgr.LoadAssetAsync<Sprite>("tip_icon_warning", sprite => _iconWarning = sprite).Forget();
-        ResMgr.LoadAssetAsync<Sprite>("tip_icon_error", sprite => _iconError = sprite).Forget();
+        Mgr.Instance.Loader.LoadAssetAsync<Sprite>("tip_icon_normal", sprite => _iconNormal = sprite).Forget();
+        Mgr.Instance.Loader.LoadAssetAsync<Sprite>("tip_icon_success", sprite => _iconSuccess = sprite).Forget();
+        Mgr.Instance.Loader.LoadAssetAsync<Sprite>("tip_icon_warning", sprite => _iconWarning = sprite).Forget();
+        Mgr.Instance.Loader.LoadAssetAsync<Sprite>("tip_icon_error", sprite => _iconError = sprite).Forget();
     }
 
     protected override void OnShow(object args)

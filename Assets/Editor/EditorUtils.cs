@@ -28,12 +28,22 @@ public class EditorUtils
     /// </summary>
     private class ExcelConfig
     {
-        public string ConfigName { get; set; }
+        /// <summary>
+        /// 类名（用于类型查找），如 "Example"
+        /// </summary>
+        public string ClassName { get; set; }
+
+        /// <summary>
+        /// JSON文件名（包含工作表信息），如 "Example_Config"
+        /// </summary>
+        public string JsonName { get; set; }
+
         public List<PropertyInfo> Properties { get; set; }
         public ISheet Sheet { get; set; }
     }
 
     private static readonly List<ExcelConfig> _excelConfigs = new();
+    private static readonly HashSet<string> _generatedClassFiles = new();
     private static readonly string[] _extensions = {".xlsx", ".xls"};
     private static readonly JsonSerializerSettings _jsonSerializerSettings = new()
     {
@@ -41,12 +51,14 @@ public class EditorUtils
         Formatting = Formatting.Indented,
     };
 
-    [MenuItem("Simple Toolkit/Excel To Json", priority = 0)]
+    [MenuItem("Simple Toolkits/Excel To Json", priority = 0)]
     public static void GenerateConfigs()
     {
         DeleteAllOldFiles();
+        _excelConfigs.Clear();        // 在开始处清空配置列表
+        _generatedClassFiles.Clear(); // 清空已生成Class文件的跟踪集合
 
-        string excelDirPath = SimpleToolkitSettings.Instance.ExcelFilePath;
+        string excelDirPath = SimpleToolkitsSettings.Instance.ExcelFilePath;
         if (!Directory.Exists(excelDirPath)) Directory.CreateDirectory(excelDirPath);
 
         string[] excelFiles = Directory.EnumerateFiles(excelDirPath)
@@ -68,24 +80,24 @@ public class EditorUtils
         {
             ReadExcel(excelFile);
         }
+
+        // 刷新资源数据库，确保新生成的类文件被编译
         AssetDatabase.Refresh();
 
-        foreach (var excelConfig in _excelConfigs)
-        {
-            GenerateConfigJson(excelConfig);
-        }
-        AssetDatabase.Refresh();
-
+        // 只在 delayCall 中生成 JSON，确保编译完成
         EditorApplication.delayCall += () =>
         {
+            var successCount = 0;
             foreach (var excelConfig in _excelConfigs)
             {
-                GenerateConfigJson(excelConfig);
+                if (GenerateConfigJson(excelConfig))
+                {
+                    successCount++;
+                }
             }
-
             AssetDatabase.Refresh();
             _excelConfigs.Clear();
-            Debug.Log("主动导出完成！");
+            Debug.Log($"JSON配置文件生成完成！成功生成 {successCount} 个文件。");
         };
     }
 
@@ -95,7 +107,6 @@ public class EditorUtils
         IWorkbook wk;
         string extension = Path.GetExtension(excelFilePath);
         string fileName = Path.GetFileNameWithoutExtension(excelFilePath);
-        _excelConfigs.Clear();
 
         using var stream = new FileStream(excelFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         if (extension.Equals(".xls"))
@@ -121,11 +132,10 @@ public class EditorUtils
         var row = sheet.GetRow(1);        // 字段名
         var rowType = sheet.GetRow(2);    // 字段类型
 
-        object rowId = row.GetCell(0);
+        var rowId = row.GetCell(0);
         if (rowId.ToString() != "id")
         {
-            Debug.LogError($"导出Configs错误！{fileName} - {sheet.SheetName}表中第一列不是id！");
-            return;
+            throw new Exception($"导出Configs错误！{fileName} - {sheet.SheetName}表中第一列不是id！");
         }
 
         List<PropertyInfo> properties = new();
@@ -145,10 +155,21 @@ public class EditorUtils
             });
         }
 
-        GenerateConfigClass(properties, fileName);
+        // 类名
+        var className = $"{fileName}Config";
+        // Class文件生成：每个Excel文件只生成一个Class文件
+        if (!_generatedClassFiles.Contains(fileName))
+        {
+            GenerateConfigClass(properties, className);
+            _generatedClassFiles.Add(fileName);
+        }
+
+        // Json配置：每个工作表生成独立的配置，使用组合名称
+        var jsonConfigName = $"{className}_{SanitizeSheetName(sheet.SheetName)}";
         _excelConfigs.Add(new ExcelConfig
         {
-            ConfigName = fileName,
+            ClassName = className,     // 类名使用文件名加Config，如 "ExampleConfig"
+            JsonName = jsonConfigName, // JSON为类名包含工作表信息，如 "ExampleConfig_Config"
             Properties = properties,
             Sheet = sheet
         });
@@ -157,22 +178,23 @@ public class EditorUtils
     /// <summary>
     /// 生成配置类文件
     /// </summary>
-    /// <param name="properties"></param>
-    /// <param name="configName"></param>
     private static void GenerateConfigClass(List<PropertyInfo> properties, string configName)
     {
-        string filePath = Path.Combine(SimpleToolkitSettings.Instance.CsOutputPath, $"{configName}Config.cs");
+        string filePath = Path.Combine(SimpleToolkitsSettings.Instance.CsOutputPath, $"{configName}.cs");
         string fileDir = Path.GetDirectoryName(filePath);
-        if (string.IsNullOrEmpty(fileDir)) fileDir = Path.Combine(Application.dataPath, "Scripts", "Configs");
+        if (string.IsNullOrEmpty(fileDir))
+        {
+            throw new Exception($"生成配置类文件失败，文件路径为空！{filePath}");
+        }
         if (!Directory.Exists(fileDir)) Directory.CreateDirectory(fileDir);
         if (File.Exists(filePath))
         {
-            Debug.LogError($"配置类已存在！{filePath}");
+            Debug.LogWarning($"配置类已存在！{filePath}");
             return;
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"public class {configName}Config : BaseConfig");
+        sb.AppendLine($"public class {configName} : BaseConfig");
         sb.AppendLine("{");
         foreach (var property in properties)
         {
@@ -193,12 +215,25 @@ public class EditorUtils
     /// 生成配置JSON文件
     /// </summary>
     /// <param name="excelConfig"></param>
-    private static void GenerateConfigJson(ExcelConfig excelConfig)
+    /// <returns>是否成功生成</returns>
+    private static bool GenerateConfigJson(ExcelConfig excelConfig)
     {
-        string filePath = Path.Combine(SimpleToolkitSettings.Instance.JsonOutputPath, $"{excelConfig.ConfigName}Config.json");
+        string filePath = Path.Combine(SimpleToolkitsSettings.Instance.JsonOutputPath, $"{excelConfig.JsonName}.json");
         string fileDir = Path.GetDirectoryName(filePath);
-        if (string.IsNullOrEmpty(fileDir)) fileDir = Path.Combine(Application.dataPath, "Resources", "JsonConfigs");
+        if (string.IsNullOrEmpty(fileDir))
+        {
+            Debug.LogError($"生成JSON文件失败，文件路径为空！{filePath}");
+            return false;
+        }
         if (!Directory.Exists(fileDir)) Directory.CreateDirectory(fileDir);
+
+        // 改进的类型查找逻辑 - 使用 ClassName 而不是 JsonName
+        var type = FindConfigType($"{excelConfig.ClassName}");
+        if (type == null)
+        {
+            Debug.LogError($"找不到类型: {excelConfig.ClassName}，请确保类文件已编译完成");
+            return false;
+        }
 
         Dictionary<string, BaseConfig> rawDataDict = new();
 
@@ -207,10 +242,26 @@ public class EditorUtils
             var row = excelConfig.Sheet.GetRow(i);
             if (row == null) break;
 
+            // 获取当前行的id值
+            var idCell = row.GetCell(0);
+            if (idCell == null)
+            {
+                Debug.LogWarning($"第{i + 1}行的id列为空，跳过该行");
+                continue;
+            }
+            var id = idCell.ToString();
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogWarning($"第{i + 1}行的id值为空，跳过该行");
+                continue;
+            }
+
             StringBuilder sb = new();
             sb.Append("{");
 
-            for (var j = 0; j <= row.LastCellNum && j < excelConfig.Properties.Count; j++)
+            // 修复循环边界，确保不超出任一边界
+            int maxColumns = Math.Min(row.LastCellNum, excelConfig.Properties.Count);
+            for (var j = 0; j < maxColumns; j++)
             {
                 var cell = row.GetCell(j);
                 if (cell == null) continue;
@@ -233,7 +284,7 @@ public class EditorUtils
                     {
                         value = "0";
                     }
-                    Debug.LogWarning($"有空值！{excelConfig.ConfigName} - {excelConfig.Sheet.SheetName}表中第{i + 1}行第{j + 1}列（字段名：{excelConfig.Properties[j].Name}）的值为空！");
+                    Debug.LogWarning($"有空值！{excelConfig.JsonName}表中第{i + 1}行第{j + 1}列（字段名：{excelConfig.Properties[j].Name}）的值为空！");
                 }
 
                 if (excelConfig.Properties[j].Type == "bool")
@@ -269,36 +320,104 @@ public class EditorUtils
                 else
                 {
                     // 字符串类型
-                    value = value.Replace("\"", "\\\""); // 转义双引号
+                    value = value.Replace("\"", "\\\""); // 转义引号
                     value = $"\"{value}\"";
                 }
 
                 sb.Append($"\"{excelConfig.Properties[j].Name}\":{value}");
-                if (j < row.LastCellNum - 1) sb.Append(",");
+                if (j < maxColumns - 1) sb.Append(",");
             }
             sb.Append("}");
 
-            var type = Type.GetType($"{excelConfig.ConfigName}Config, Assembly-CSharp");
-            if (type == null)
-            {
-                Debug.LogError($"找不到类型: {excelConfig.ConfigName}Config，可能没有编译完成");
-                continue;
-            }
-
             try
             {
-                if (JsonConvert.DeserializeObject(sb.ToString(), type) is not BaseConfig config || string.IsNullOrEmpty(config.id)) continue;
-                rawDataDict.Add(config.id, config);
+                if (JsonConvert.DeserializeObject(sb.ToString(), type) is not BaseConfig configObj
+                    || string.IsNullOrEmpty(configObj.id)) continue;
+                rawDataDict[id] = configObj;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"解析错误: {ex}");
-                break;
+                Debug.LogError($"反序列化配置对象时发生异常，行{i + 1}，id: {id}，异常: {ex.Message}");
             }
         }
 
         string json = JsonConvert.SerializeObject(rawDataDict, _jsonSerializerSettings);
         File.WriteAllText(filePath, json, Encoding.UTF8);
+
+        Debug.Log($"JSON文件已生成: {filePath}，包含 {rawDataDict.Count} 条数据");
+        return true;
+    }
+
+    /// <summary>
+    /// 改进的类型查找方法，搜索所有已加载的程序集
+    /// </summary>
+    /// <param name="typeName">类型名称</param>
+    /// <returns>找到的类型，如果没找到则返回null</returns>
+    private static Type FindConfigType(string typeName)
+    {
+        // 尝试在 Assembly-CSharp 中查找
+        var type = Type.GetType($"{typeName}, Assembly-CSharp");
+        if (type != null) return type;
+
+        // 搜索所有已加载的程序集
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            type = assembly.GetType(typeName);
+            if (type != null) return type;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 清理工作表名称，确保生成有效的C#标识符和文件名
+    /// </summary>
+    /// <param name="sheetName">原始工作表名称</param>
+    /// <returns>清理后的工作表名称</returns>
+    private static string SanitizeSheetName(string sheetName)
+    {
+        if (string.IsNullOrEmpty(sheetName))
+        {
+            return "Sheet";
+        }
+
+        var sb = new StringBuilder();
+
+        // 确保第一个字符是字母或下划线
+        char firstChar = sheetName[0];
+        if (char.IsLetter(firstChar) || firstChar == '_')
+        {
+            sb.Append(firstChar);
+        }
+        else
+        {
+            sb.Append('_');
+        }
+
+        // 处理其余字符，只保留字母、数字和下划线
+        for (var i = 1; i < sheetName.Length; i++)
+        {
+            char c = sheetName[i];
+            if (char.IsLetterOrDigit(c) || c == '_')
+            {
+                sb.Append(c);
+            }
+            else
+            {
+                sb.Append('_');
+            }
+        }
+
+        // 移除连续的下划线并确保不以下划线结尾
+        var result = sb.ToString();
+        while (result.Contains("__"))
+        {
+            result = result.Replace("__", "_");
+        }
+        result = result.TrimEnd('_');
+
+        // 确保结果不为空
+        return string.IsNullOrEmpty(result) ? "Sheet" : result;
     }
 
     /// <summary>
@@ -312,7 +431,7 @@ public class EditorUtils
         var inQuotes = false;
         var currentItem = new StringBuilder();
 
-        for (int i = 0; i < input.Length; i++)
+        for (var i = 0; i < input.Length; i++)
         {
             char c = input[i];
 
@@ -355,7 +474,7 @@ public class EditorUtils
     /// </summary>
     private static void DeleteAllOldFiles()
     {
-        var settings = SimpleToolkitSettings.Instance;
+        var settings = SimpleToolkitsSettings.Instance;
 
         if (Directory.Exists(settings.CsOutputPath)) Directory.Delete(settings.CsOutputPath, true);
         if (Directory.Exists(settings.JsonOutputPath)) Directory.Delete(settings.JsonOutputPath, true);

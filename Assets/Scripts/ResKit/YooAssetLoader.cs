@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -11,7 +13,7 @@ using Object = UnityEngine.Object;
 /// YooAsset资源加载器
 /// 采用"即时卸载"策略：使用using语句自动管理AssetHandle生命周期，使用字典缓存管理
 /// </summary>
-public class YooAssetLoader : IResLoader, IDisposable
+public class YooAssetLoader : IDisposable
 {
     private readonly Dictionary<string, Object> _assetCache;
 
@@ -19,8 +21,6 @@ public class YooAssetLoader : IResLoader, IDisposable
     /// 获取运行模式。
     /// </summary>
     public readonly EPlayMode playMode;
-
-    public YooAssetLoader() : this(EPlayMode.OfflinePlayMode) { }
 
     public YooAssetLoader(EPlayMode gamePlayMode)
     {
@@ -42,6 +42,45 @@ public class YooAssetLoader : IResLoader, IDisposable
 
         Debug.Log($"资源系统运行模式：{playMode}\nYooAsset 资源加载器，初始化完成！");
     }
+
+    /// <summary>
+    /// 并行初始化多个资源包
+    /// </summary>
+    /// <param name="packageInfos">资源包信息列表</param>
+    public async UniTask InitPackagesAsync(List<YooPackageInfo> packageInfos)
+    {
+        if (packageInfos == null || packageInfos.Count == 0)
+        {
+            Debug.LogWarning("资源包信息列表为空，跳过包初始化");
+            return;
+        }
+
+        try
+        {
+            // 创建并行任务列表
+            var initTasks = packageInfos.Select(packageInfo => InitPackageAsync(
+                packageInfo.packageName,
+                packageInfo.hostServerURL,
+                packageInfo.fallbackHostServerURL,
+                packageInfo.isDefaultPackage
+            )).ToArray();
+
+            // 等待所有任务完成
+            bool[] results = await UniTask.WhenAll(initTasks);
+            for (var i = 0; i < results.Length; i++)
+            {
+                if (!results[i])
+                {
+                    Debug.LogError($"资源包 {packageInfos[i].packageName} 初始化失败!");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError(ex);
+        }
+    }
+
 
     /// <summary>
     /// 初始化资源包
@@ -214,6 +253,13 @@ public class YooAssetLoader : IResLoader, IDisposable
         }
     }
 
+    /// <summary>
+    /// 异步加载资源
+    /// </summary>
+    /// <typeparam name="T">资源类型</typeparam>
+    /// <param name="location">资源路径</param>
+    /// <param name="onCompleted">加载完成回调</param>
+    /// <returns>加载的资源对象</returns>
     public async UniTask<T> LoadAssetAsync<T>(string location, Action<T> onCompleted = null) where T : Object
     {
         // 检查缓存
@@ -253,6 +299,14 @@ public class YooAssetLoader : IResLoader, IDisposable
         return handle;
     }
 
+    /// <summary>
+    /// 异步加载子资源
+    /// </summary>
+    /// <param name="location">场景的定位地址</param>
+    /// <param name="subName">子资源名称</param>
+    /// <param name="onCompleted">加载完成回调</param>
+    /// <typeparam name="T">资源类型</typeparam>
+    /// <returns>加载的子资源对象</returns>
     public async UniTask<T> LoadSubAssetAsync<T>(string location, string subName, Action<T> onCompleted = null) where T : Object
     {
         var cacheKey = $"{location}#{subName}";
@@ -280,6 +334,13 @@ public class YooAssetLoader : IResLoader, IDisposable
         return null;
     }
 
+    /// <summary>
+    /// 异步加载图集中的精灵
+    /// </summary>
+    /// <param name="location">图集路径</param>
+    /// <param name="spriteName">精灵名称</param>
+    /// /// <param name="onCompleted">加载完成回调</param>
+    /// <returns>加载的精灵对象</returns>
     public async UniTask<Sprite> LoadSpriteAsync(string location, string spriteName, Action<Sprite> onCompleted = null)
     {
         var cacheKey = $"{location}@{spriteName}";
@@ -310,6 +371,13 @@ public class YooAssetLoader : IResLoader, IDisposable
         return null;
     }
 
+    /// <summary>
+    /// 异步批量加载多个资源
+    /// </summary>
+    /// <typeparam name="T">资源类型</typeparam>
+    /// <param name="location">资源路径或标签</param>
+    /// /// <param name="onCompleted">加载完成回调</param>
+    /// <returns>加载的资源对象数组</returns>
     public async UniTask<List<T>> LoadAllAssetAsync<T>(string location, Action<List<T>> onCompleted = null) where T : Object
     {
         var loadedAssets = new List<T>();
@@ -367,16 +435,29 @@ public class YooAssetLoader : IResLoader, IDisposable
         return loadedAssets;
     }
 
+    /// <summary>
+    /// 检查资源是否已缓存
+    /// </summary>
+    /// <param name="location">资源路径</param>
+    /// <returns>是否已缓存</returns>
     public bool HasAsset(string location)
     {
         return _assetCache.ContainsKey(location);
     }
 
+    /// <summary>
+    /// 获取缓存中的资源数量
+    /// </summary>
+    /// <returns>缓存资源数量</returns>
     public int GetCacheCount()
     {
         return _assetCache.Count;
     }
 
+    /// <summary>
+    /// 释放资源
+    /// </summary>
+    /// <param name="asset">要释放的资源</param>
     public void Release(Object asset)
     {
         if (asset == null) return;
@@ -397,6 +478,9 @@ public class YooAssetLoader : IResLoader, IDisposable
         }
     }
 
+    /// <summary>
+    /// 释放所有资源并清空缓存
+    /// </summary>
     public void UnloadAllAssetsAsync()
     {
         _assetCache.Clear();

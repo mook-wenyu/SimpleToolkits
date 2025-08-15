@@ -7,18 +7,10 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// 通用对象池管理器
 /// </summary>
-public class PoolMgr : MonoSingleton<PoolMgr>
+public class PoolMgr
 {
     // 存储所有对象池的字典，key为池名称，value为对象池实例
     private readonly Dictionary<string, IPool> _pools = new();
-
-    /// <summary>
-    /// 初始化对象池管理器
-    /// </summary>
-    public void Init()
-    {
-        Debug.Log("PoolMgr 初始化完成");
-    }
 
     /// <summary>
     /// 获取或创建对象池
@@ -88,7 +80,7 @@ public class PoolMgr : MonoSingleton<PoolMgr>
     /// <param name="poolName">对象池名称</param>
     public void RecycleToPool<T>(T obj, string poolName) where T : Object
     {
-        if (obj == null) return;
+        if (!obj) return;
 
         if (_pools.TryGetValue(poolName, out var existingPool) && existingPool is ObjPool<T> typedPool)
         {
@@ -104,7 +96,7 @@ public class PoolMgr : MonoSingleton<PoolMgr>
     /// 清空指定对象池
     /// </summary>
     /// <param name="poolName">对象池名称，为空则清空所有对象池</param>
-    public void ClearPool(string poolName = null)
+    public void Clear(string poolName = null)
     {
         if (string.IsNullOrEmpty(poolName))
         {
@@ -133,7 +125,7 @@ public class PoolMgr : MonoSingleton<PoolMgr>
     /// </summary>
     /// <param name="poolName">对象池名称</param>
     /// <returns>是否存在</returns>
-    public bool HasPool(string poolName)
+    public bool Has(string poolName)
     {
         return _pools.ContainsKey(poolName);
     }
@@ -162,9 +154,4 @@ public class PoolMgr : MonoSingleton<PoolMgr>
         return names;
     }
 
-    protected override void OnDestroy()
-    {
-        ClearPool();
-        base.OnDestroy();
-    }
 }

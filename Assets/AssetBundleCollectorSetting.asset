@@ -29,7 +29,7 @@ MonoBehaviour:
       AssetTags: UI
       ActiveRuleName: EnableGroup
       Collectors:
-      - CollectPath: Assets/Resources/UI
+      - CollectPath: Assets/GameRes/UI
         CollectorGUID: 03197eed7735577488544473b4447e91
         CollectorType: 0
         AddressRuleName: AddressByFileName
@@ -42,7 +42,7 @@ MonoBehaviour:
       AssetTags: JsonConfigs
       ActiveRuleName: EnableGroup
       Collectors:
-      - CollectPath: Assets/Resources/JsonConfigs
+      - CollectPath: Assets/GameRes/JsonConfigs
         CollectorGUID: 28f373b9f89658844ad276c58b31756a
         CollectorType: 0
         AddressRuleName: AddressByFileName
@@ -55,8 +55,21 @@ MonoBehaviour:
       AssetTags: Prefab
       ActiveRuleName: EnableGroup
       Collectors:
-      - CollectPath: Assets/Resources/Prefabs
+      - CollectPath: Assets/GameRes/Prefabs
         CollectorGUID: 623b6fa4b96276a4e813d5a4680d6ff3
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Scenes
+      GroupDesc: "\u573A\u666F"
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Scenes
+        CollectorGUID: 109e9bdd0fcc649c5bc59085c35bdc83
         CollectorType: 0
         AddressRuleName: AddressByFileName
         PackRuleName: PackDirectory

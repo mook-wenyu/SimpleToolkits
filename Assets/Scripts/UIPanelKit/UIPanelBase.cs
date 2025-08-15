@@ -9,7 +9,7 @@ using UnityEngine;
 public abstract class UIPanelBase : MonoBehaviour
 {
     // UI管理器引用
-    protected UIMgr uiMgr;
+    protected UIBehaviour uiBehaviour;
 
     // 当前面板状态
     protected UIPanelStateType mStateType = UIPanelStateType.None;
@@ -36,9 +36,9 @@ public abstract class UIPanelBase : MonoBehaviour
     /// <summary>
     /// 初始化面板
     /// </summary>
-    public virtual void Init(UIMgr uiMgrr)
+    public virtual void Init(UIBehaviour uiMgrr)
     {
-        this.uiMgr = uiMgrr;
+        this.uiBehaviour = uiMgrr;
         mStateType = UIPanelStateType.Loaded;
         OnInit();
     }
@@ -60,7 +60,7 @@ public abstract class UIPanelBase : MonoBehaviour
     public virtual void Hide(bool destroy = false)
     {
         // 通过UI管理器处理面板关闭
-        uiMgr.HidePanel(this, destroy).Forget();
+        uiBehaviour.HidePanel(this, destroy).Forget();
     }
 
     /// <summary>
@@ -72,9 +72,9 @@ public abstract class UIPanelBase : MonoBehaviour
         mStateType = UIPanelStateType.Hidden;
 
         // 从正在显示的面板字典中移除
-        if (uiMgr)
+        if (uiBehaviour)
         {
-            _ = uiMgr.RemoveFromOpenedPanels(this);
+            _ = uiBehaviour.RemoveFromOpenedPanels(this);
         }
 
         OnHide();

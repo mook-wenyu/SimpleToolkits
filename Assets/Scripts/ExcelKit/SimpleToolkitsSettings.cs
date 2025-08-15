@@ -6,13 +6,10 @@ using UnityEditor;
 using UnityEngine;
 using YooAsset;
 
-[CreateAssetMenu(fileName = "Simple Toolkit Settings", menuName = "Simple Toolkits/Simple Toolkit Settings")]
+[CreateAssetMenu(fileName = "Simple Toolkits Settings", menuName = "Simple Toolkits/Simple Toolkits Settings")]
 [Serializable]
-public class SimpleToolkitSettings : ScriptableObject
+public class SimpleToolkitsSettings : ScriptableObject
 {
-    [Tooltip("资源加载器类型，使用 YooAsset 需要将该分组 Asset Tags 改为 JsonConfigs")]
-    [SerializeField] private LoaderType loaderType = LoaderType.YooAsset;
-
     [Tooltip("YooAsset 运行模式")]
     [SerializeField] private EPlayMode gamePlayMode = EPlayMode.OfflinePlayMode;
 
@@ -24,32 +21,24 @@ public class SimpleToolkitSettings : ScriptableObject
     {
         new Language
         {
-            key = "cn",
+            langKey = "cn",
             language = SystemLanguage.ChineseSimplified
         },
         new Language
         {
-            key = "en",
+            langKey = "en",
             language = SystemLanguage.English
         }
     };
 
+    [Tooltip("语言配置表文件名")]
+    [SerializeField] private string languageExcelFileName = "Languages";
+
     [Tooltip("生成 .cs 文件的路径")]
     [SerializeField] private string csOutputPath = "Assets/Scripts/Configs";
 
-    [Tooltip("生成 .json 文件的路径")]
+    [Tooltip("生成 .json 文件的路径，需要将该分组 Asset Tags 改为 JsonConfigs")]
     [SerializeField] private string jsonOutputPath = "Assets/GameRes/JsonConfigs";
-
-    [Tooltip("UI 面板预制体路径（基于 Resources 路径）")]
-    [SerializeField] private string uiPanelPath = "Prefabs/UIPanel";
-    
-    [Tooltip("音频路径（基于 Resources 路径）")]
-    [SerializeField] private string audioPath = "Audio";
-
-    /// <summary>
-    /// 资源加载器类型
-    /// </summary>
-    public LoaderType LoaderType => loaderType;
 
     /// <summary>
     /// YooAsset 运行模式
@@ -65,7 +54,7 @@ public class SimpleToolkitSettings : ScriptableObject
     /// 支持的语言列表
     /// </summary>
     public List<Language> SupportedLanguages => supportedLanguages;
-
+    
     /// <summary>
     /// Excel 文件路径
     /// </summary>
@@ -81,23 +70,12 @@ public class SimpleToolkitSettings : ScriptableObject
     /// </summary>
     public string JsonOutputPath => jsonOutputPath;
 
-    /// <summary>
-    /// UI 面板预制体路径
-    /// </summary>
-    public string UIPanelPath => uiPanelPath;
-    
-    /// <summary>
-    /// 音频路径
-    /// </summary>
-    public string AudioPath => audioPath;
-    
-
 #if UNITY_EDITOR
     /* ---------- 单例访问 ---------- */
-    private const string AssetName = "SimpleToolkitSettings.asset";
+    private const string AssetName = "SimpleToolkitsSettings.asset";
 
-    private static SimpleToolkitSettings _instance;
-    public static SimpleToolkitSettings Instance
+    private static SimpleToolkitsSettings _instance;
+    public static SimpleToolkitsSettings Instance
     {
         get
         {
@@ -106,14 +84,14 @@ public class SimpleToolkitSettings : ScriptableObject
                 const string dir = "Assets/Resources";
                 string path = Path.Combine(dir, AssetName);
 
-                _instance = AssetDatabase.LoadAssetAtPath<SimpleToolkitSettings>(path.Replace("\\", "/"));
+                _instance = AssetDatabase.LoadAssetAtPath<SimpleToolkitsSettings>(path.Replace("\\", "/"));
                 if (!_instance)
                 {
                     if (Directory.Exists(dir) is false)
                     {
                         Directory.CreateDirectory(dir);
                     }
-                    _instance = CreateInstance<SimpleToolkitSettings>();
+                    _instance = CreateInstance<SimpleToolkitsSettings>();
                     AssetDatabase.CreateAsset(_instance, path.Replace("\\", "/"));
                     AssetDatabase.SaveAssets();
                 }

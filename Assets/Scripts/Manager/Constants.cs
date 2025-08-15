@@ -12,5 +12,10 @@ public static class Constants
     /// <summary>
     /// 配置管理器设置名称
     /// </summary>
-    public const string SimpleToolkitSettingsName = "SimpleToolkitSettings";
+    public const string SimpleToolkitsSettingsName = "SimpleToolkitsSettings";
+    
+    /// <summary>
+    /// Json 配置资源标签名称
+    /// </summary>
+    public const string JsonConfigsAssetTagName = "JsonConfigs";
 }

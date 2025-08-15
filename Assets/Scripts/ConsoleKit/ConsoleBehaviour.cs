@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ConsoleMgr : MonoSingleton<ConsoleMgr>
+public class ConsoleBehaviour : MonoBehaviour
 {
 
 #if UNITY_ANDROID || UNITY_IOS
@@ -13,8 +13,6 @@ public class ConsoleMgr : MonoSingleton<ConsoleMgr>
     private const int Margin = 20;
     private Rect _windowRect = new(Margin, Margin + 540 / 2f, 960 * 0.5f - (2 * Margin),
         540 - (2 * Margin));
-
-    private readonly GUIContent _clearLabel = new("清除", "清除控制台的内容。");
 
     private Vector2 _scrollPos;
     private readonly List<ConsoleMessage> _entries = new();
@@ -55,13 +53,13 @@ public class ConsoleMgr : MonoSingleton<ConsoleMgr>
         }
     }
 
-    public void Init()
+    private void Awake()
     {
         Application.logMessageReceived += HandleLog;
         RegisterBuiltinCommands();
     }
 
-    protected override void OnDestroy()
+    private void OnDestroy()
     {
         Application.logMessageReceived -= HandleLog;
     }

@@ -1,0 +1,19 @@
+{
+    "name": "SimpleToolkits.Editor",
+    "rootNamespace": "SimpleToolkits",
+    "references": [
+        "GUID:4d1926c9df5b052469a1c63448b7609a",
+        "GUID:26f39b8883b2cb644aed5dbd9d23a69b"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

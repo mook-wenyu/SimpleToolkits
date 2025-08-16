@@ -7,7 +7,7 @@ namespace SimpleToolkits
     /// 对象池
     /// </summary>
     /// <typeparam name="T">对象类型</typeparam>
-    internal sealed class ObjPool<T> : IPool where T : Object
+    internal sealed class ObjPool<T> : IObjPool where T : Object
     {
         public readonly ObjectPool<T> objPool;
 
@@ -16,21 +16,21 @@ namespace SimpleToolkits
             this.objPool = objPool;
         }
 
-        Object IPool.Get()
+        Object IObjPool.Get()
         {
             return objPool.Get();
         }
 
-        void IPool.Release(Object obj)
+        void IObjPool.Release(Object obj)
         {
             objPool.Release(obj as T);
         }
 
-        void IPool.Clear()
+        void IObjPool.Clear()
         {
             objPool.Clear();
         }
 
-        int IPool.CountInactive => objPool.CountInactive;
+        int IObjPool.CountInactive => objPool.CountInactive;
     }
 }

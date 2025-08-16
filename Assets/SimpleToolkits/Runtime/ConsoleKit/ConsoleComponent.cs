@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace SimpleToolkits
 {
-    public class ConsoleBehaviour : MonoBehaviour
+    public class ConsoleComponent : MonoBehaviour
     {
 
 #if UNITY_ANDROID || UNITY_IOS

@@ -11,7 +11,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 场景管理器
     /// </summary>
-    public class SceneBehaviour : MonoBehaviour
+    public class SceneComponent : MonoBehaviour
     {
         private sealed class SceneHandleData
         {
@@ -191,7 +191,7 @@ namespace SimpleToolkits
                 return null;
             }
 
-            var sceneOperationHandle = Mgr.Instance.Loader.LoadSceneAsync(sceneAssetName, sceneMode, LocalPhysicsMode.None, true);
+            var sceneOperationHandle = GSMgr.Instance.GetObject<YooAssetLoader>().LoadSceneAsync(sceneAssetName, sceneMode, LocalPhysicsMode.None, true);
             _loadingSceneAssetNames.Add(sceneAssetName, new SceneHandleData(sceneOperationHandle, userData));
             sceneOperationHandle.Completed += OnLoadSceneCompleted;
             return sceneOperationHandle;

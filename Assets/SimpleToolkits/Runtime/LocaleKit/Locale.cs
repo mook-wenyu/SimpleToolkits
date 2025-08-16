@@ -24,20 +24,21 @@ namespace SimpleToolkits
             set
             {
                 _currentLanguage = value;
-                PlayerPrefs.SetInt("CURRENT_LANGUAGE_INDEX", Mgr.Instance.Settings.SupportedLanguages.FindIndex(l => l.language == value));
+                var languageIndex = GSMgr.Instance.Settings.SupportedLanguages.FindIndex(l => l.language == value);
+                PlayerPrefs.SetInt("CURRENT_LANGUAGE_INDEX", languageIndex);
                 OnLanguageChanged?.Invoke(value);
             }
         }
 
         public Locale()
         {
-            int languageIndex = PlayerPrefs.GetInt("CURRENT_LANGUAGE_INDEX", 0);
+            var languageIndex = PlayerPrefs.GetInt("CURRENT_LANGUAGE_INDEX", 0);
 
-            if (languageIndex >= Mgr.Instance.Settings.SupportedLanguages.Count)
+            if (languageIndex >= GSMgr.Instance.Settings.SupportedLanguages.Count)
             {
                 languageIndex = 0;
             }
-            ChangeLanguage(Mgr.Instance.Settings.SupportedLanguages[languageIndex].language);
+            ChangeLanguage(GSMgr.Instance.Settings.SupportedLanguages[languageIndex].language);
         }
 
         /// <summary>
@@ -45,17 +46,51 @@ namespace SimpleToolkits
         /// </summary>
         public void InitLanguage()
         {
-            var languages = Mgr.Instance.Data.GetAll<LanguagesConfig>();
+            // 获取配置数据
+            var configData = GSMgr.Instance.GetObject<ConfigData>();
+            var type = TypeReflectionUtility.FindType("LanguagesConfig", "Assembly-CSharp");
+            if (type == null)
+            {
+                Debug.LogError("LanguagesConfig type not found");
+                return;
+            }
+            var langKeyField = type.GetField("langKey");
+            var textField = type.GetField("text");
+            var languages = configData.GetAll(type);
+            if (languages == null || languages.Count == 0)
+            {
+                Debug.LogError("LanguagesConfig is empty");
+                return;
+            }
             foreach (var lang in languages)
             {
-                var l = Mgr.Instance.Settings.SupportedLanguages.Find(l => l.langKey == lang.langKey);
-                if (!_localeDataDict.ContainsKey(l.language))
+                var langKey = langKeyField?.GetValue(lang) as string;
+                var text = textField?.GetValue(lang) as string;
+                if (string.IsNullOrEmpty(langKey) || string.IsNullOrEmpty(text))
                 {
-                    _localeDataDict.Add(l.language, new Dictionary<string, string>());
+                    Debug.LogWarning("LanguagesConfig has null or empty langKey or text, skipping.");
+                    continue;
                 }
-                _localeDataDict[l.language][lang.id] = lang.text;
+
+                // 查找匹配的语言配置
+                var supportedLanguage = GSMgr.Instance.Settings.SupportedLanguages.Find(l => l.langKey == langKey);
+
+                if (!_localeDataDict.ContainsKey(supportedLanguage.language))
+                {
+                    _localeDataDict[supportedLanguage.language] = new Dictionary<string, string>();
+                }
+                if (!string.IsNullOrEmpty(lang.id))
+                {
+                    _localeDataDict[supportedLanguage.language][lang.id] = text;
+                }
+                else
+                {
+                    Debug.LogWarning($"LanguagesConfig has null or empty id for langKey '{langKey}', skipping.");
+                }
             }
-            Mgr.Instance.Data.Remove<LanguagesConfig>();
+
+            // 清理配置数据
+            configData.Remove(type);
         }
 
         /// <summary>
@@ -100,7 +135,7 @@ namespace SimpleToolkits
         /// <returns></returns>
         public string GetText(SystemLanguage language, string key)
         {
-            if (_localeDataDict.TryGetValue(language, out var dict) && dict.TryGetValue(key, out string text))
+            if (_localeDataDict.TryGetValue(language, out var dict) && dict.TryGetValue(key, out var text))
             {
                 return text;
             }

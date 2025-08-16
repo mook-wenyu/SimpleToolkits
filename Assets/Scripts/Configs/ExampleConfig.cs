@@ -1,4 +1,5 @@
 ﻿using SimpleToolkits;
+
 public class ExampleConfig : BaseConfig
 {
     /// <summary>

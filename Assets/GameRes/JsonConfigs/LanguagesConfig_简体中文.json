@@ -1,9 +1,15 @@
 ﻿{
-  "$type": "System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[BaseConfig, Assembly-CSharp]], mscorlib",
+  "$type": "System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[SimpleToolkits.BaseConfig, SimpleToolkits]], mscorlib",
   "Test": {
     "$type": "LanguagesConfig, Assembly-CSharp",
     "text": "测试",
     "langKey": "cn",
     "id": "Test"
+  },
+  "Info": {
+    "$type": "LanguagesConfig, Assembly-CSharp",
+    "text": "信息",
+    "langKey": "cn",
+    "id": "Info"
   }
 }

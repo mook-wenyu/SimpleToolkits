@@ -11,35 +11,40 @@ namespace SimpleToolkits
     /// <summary>
     /// UI管理器，负责管理所有UI面板的生命周期
     /// </summary>
-    public class UIBehaviour : MonoBehaviour
+    public class UIComponent : MonoBehaviour
     {
         // UI Canvas
         private Canvas _uiCanvas;
-
         // 各层级的父节点
         private readonly Dictionary<UILayerType, Transform> _layerDict = new();
-
         // 当前打开的UI面板实例（使用UniqueId作为key）
         private readonly Dictionary<string, UIPanelBase> _openedPanelDict = new();
-
         // UI面板配置信息存储（面板类型名称 -> 配置信息）
         private readonly Dictionary<string, UIPanelInfo> _panelConfigs = new();
-
         // UI栈(用于管理UI层级关系和返回逻辑)
         private readonly Stack<UIPanelBase> _uiStack = new();
-
         // 正在隐藏的面板集合（用于防止重复隐藏）
         private readonly HashSet<string> _hidingPanels = new();
-
+        // 对象池管理器
+        private PoolMgr _poolMgr;
         // 是否正在执行UI动画（用于防止动画过程中重复操作）
         private bool _isPlayingAnim;
-
         // 是否正在执行GoBack操作（用于防止重复的GoBack调用）
         private bool _isGoingBack;
 
         #region 初始化
         private void Awake()
         {
+            var poolMgrService = GSMgr.Instance.Service.GetService<PoolMgrService>();
+            if (poolMgrService == null)
+            {
+                throw new InvalidOperationException("PoolMgrService is not registered or initialized.");
+            }
+            _poolMgr = GSMgr.Instance.GetObject<PoolMgr>();
+            if (_poolMgr == null)
+            {
+                throw new InvalidOperationException("PoolMgr is not initialized in PoolMgrService.");
+            }
             InitializeCanvas();
             InitLayers();
             InitMaskPrefab();
@@ -130,10 +135,10 @@ namespace SimpleToolkits
         private async UniTask<bool> EnsurePanelResourcesAsync<T>() where T : UIPanelBase
         {
             // 构建预制体路径
-            string prefabPath = typeof(T).Name;
+            var prefabPath = typeof(T).Name;
 
             // 加载预制体
-            var prefab = await Mgr.Instance.Loader.LoadAssetAsync<GameObject>(prefabPath);
+            var prefab = await GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<GameObject>(prefabPath);
             if (!prefab)
             {
                 Debug.LogError($"加载UI预制体失败: {typeof(T).Name}, 路径: {prefabPath}");
@@ -141,7 +146,7 @@ namespace SimpleToolkits
             }
 
             // 创建对象池
-            bool pool = GetOrCreateUIPool<T>(prefab);
+            var pool = GetOrCreateUIPool<T>(prefab);
             if (pool) return true;
 
             Debug.LogError($"创建对象池失败: {typeof(T).Name}");
@@ -164,7 +169,7 @@ namespace SimpleToolkits
             int preCreateCount = 1) where T : UIPanelBase
         {
             // 获取面板名称
-            string panelName = typeof(T).Name;
+            var panelName = typeof(T).Name;
 
             if (preCreateCount <= 0)
             {
@@ -187,7 +192,7 @@ namespace SimpleToolkits
             _panelConfigs[panelName] = panelInfo;
 
             // 确保面板资源已准备（加载预制体、缓存并创建对象池）
-            bool success = await EnsurePanelResourcesAsync<T>();
+            var success = await EnsurePanelResourcesAsync<T>();
             if (!success)
             {
                 Debug.LogError($"预注册面板失败，无法加载预制体: {panelName}");
@@ -257,7 +262,7 @@ namespace SimpleToolkits
         /// <typeparam name="T">面板类型</typeparam>
         private UIPanelInfo GetPanelConfig<T>() where T : UIPanelBase
         {
-            string panelName = typeof(T).Name;
+            var panelName = typeof(T).Name;
 
             if (_panelConfigs.TryGetValue(panelName, out var config))
             {
@@ -292,7 +297,9 @@ namespace SimpleToolkits
                 return null;
             }
 
-            string panelName = typeof(T).Name;
+            var panelName = typeof(T).Name;
+            
+            // TODO: 音效
 
             // 检查面板是否已打开（如果不允许多实例）
             if (!panelInfo.allowMultiple.ToBool())
@@ -395,7 +402,7 @@ namespace SimpleToolkits
             _hidingPanels.Add(panel.UniqueId);
 
             // 获取面板配置信息（用于获取动画类型）
-            string panelName = panel.PanelName;
+            var panelName = panel.PanelName;
             var animType = UIPanelAnimType.None;
 
             if (_panelConfigs.TryGetValue(panelName, out var config))
@@ -403,8 +410,7 @@ namespace SimpleToolkits
                 animType = config.animType;
             }
 
-            // 播放关闭音效
-            AudioMgr.Instance.PlaySound("UI_关闭").Forget();
+            // TODO: 音效
 
             // 从UI栈中移除
             if (_uiStack.Count > 0 && _uiStack.Peek() == panel)
@@ -583,7 +589,7 @@ namespace SimpleToolkits
         private void InitMaskPrefab()
         {
             // 创建遮罩对象池，使用代码创建的遮罩对象
-            bool success = Mgr.Instance.Pool.GetOrCreatePool<GameObject>(
+            var success = _poolMgr.GetOrCreatePool<GameObject>(
                 poolName: nameof(UIMaskPanel),
                 createFunc: CreateMaskObject,
                 actionOnGet: OnGetFromUIPool,
@@ -646,7 +652,7 @@ namespace SimpleToolkits
             if (!panel) return;
 
             // 从遮罩对象池获取遮罩
-            var maskObj = Mgr.Instance.Pool.GetFromPool<GameObject>(nameof(UIMaskPanel));
+            var maskObj = _poolMgr.GetFromPool<GameObject>(nameof(UIMaskPanel));
             if (!maskObj)
             {
                 Debug.LogError("无法从对象池获取遮罩对象，请确保已初始化遮罩预制体");
@@ -665,7 +671,7 @@ namespace SimpleToolkits
 
             // 设置父对象为面板所在层的父对象
             maskObj.transform.SetParent(panel.transform.parent, false);
-            int panelIndex = panel.transform.GetSiblingIndex();
+            var panelIndex = panel.transform.GetSiblingIndex();
             if (panelIndex > maskObj.transform.GetSiblingIndex())
             {
                 maskObj.transform.SetSiblingIndex(panelIndex - 1);
@@ -707,7 +713,7 @@ namespace SimpleToolkits
         {
             if (!panel) return;
 
-            string maskName = "Mask_" + panel.UniqueId;
+            var maskName = "Mask_" + panel.UniqueId;
             var parent = panel.transform.parent;
 
             if (!parent) return;
@@ -738,7 +744,7 @@ namespace SimpleToolkits
         /// </summary>
         private bool GetOrCreateUIPool<T>(GameObject prefab) where T : UIPanelBase
         {
-            return Mgr.Instance.Pool.GetOrCreatePool<GameObject>(
+            return _poolMgr.GetOrCreatePool<GameObject>(
                 poolName: typeof(T).Name,
                 createFunc: () => CreateUIPooledObject(prefab),
                 actionOnGet: OnGetFromUIPool,
@@ -791,8 +797,8 @@ namespace SimpleToolkits
         /// </summary>
         private GameObject GetFromUIPool<T>() where T : UIPanelBase
         {
-            string panelName = typeof(T).Name;
-            return Mgr.Instance.Pool.GetFromPool<GameObject>(panelName);
+            var panelName = typeof(T).Name;
+            return _poolMgr.GetFromPool<GameObject>(panelName);
         }
 
         /// <summary>
@@ -801,7 +807,7 @@ namespace SimpleToolkits
         private void RecycleToUIPool(GameObject obj, string panelName)
         {
             if (!obj) return;
-            Mgr.Instance.Pool.RecycleToPool<GameObject>(obj, panelName);
+            _poolMgr.RecycleToPool<GameObject>(obj, panelName);
         }
 
         /// <summary>
@@ -809,7 +815,7 @@ namespace SimpleToolkits
         /// </summary>
         public void ClearUIPool(string panelName = null)
         {
-            Mgr.Instance.Pool.Clear(panelName);
+            _poolMgr.Clear(panelName);
         }
 
         /// <summary>
@@ -849,7 +855,7 @@ namespace SimpleToolkits
         /// </summary>
         public T GetPanel<T>() where T : UIPanelBase
         {
-            string panelName = typeof(T).Name;
+            var panelName = typeof(T).Name;
 
             // 查找第一个匹配类型的面板
             foreach (var kvp in _openedPanelDict)
@@ -882,7 +888,7 @@ namespace SimpleToolkits
         /// <returns>面板配置信息，如果未注册则返回null</returns>
         public UIPanelInfo? GetPanelInfo<T>() where T : UIPanelBase
         {
-            string panelName = typeof(T).Name;
+            var panelName = typeof(T).Name;
             return _panelConfigs.TryGetValue(panelName, out var config) ? config : null;
         }
 
@@ -902,8 +908,8 @@ namespace SimpleToolkits
         /// <returns>是否成功移除</returns>
         public bool UnregisterPanel<T>() where T : UIPanelBase
         {
-            string panelName = typeof(T).Name;
-            bool removed = _panelConfigs.Remove(panelName);
+            var panelName = typeof(T).Name;
+            var removed = _panelConfigs.Remove(panelName);
 
             if (removed)
             {

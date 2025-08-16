@@ -5,7 +5,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 对象池接口
     /// </summary>
-    public interface IPool
+    public interface IObjPool
     {
         /// <summary>
         /// 从对象池获取对象

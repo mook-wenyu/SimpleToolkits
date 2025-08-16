@@ -1,4 +1,5 @@
 ﻿using SimpleToolkits;
+
 public class LanguagesConfig : BaseConfig
 {
     /// <summary>

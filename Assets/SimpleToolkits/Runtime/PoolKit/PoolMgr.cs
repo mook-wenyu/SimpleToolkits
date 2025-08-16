@@ -12,7 +12,7 @@ namespace SimpleToolkits
     public class PoolMgr
     {
         // 存储所有对象池的字典，key为池名称，value为对象池实例
-        private readonly Dictionary<string, IPool> _pools = new();
+        private readonly Dictionary<string, IObjPool> _pools = new();
 
         /// <summary>
         /// 获取或创建对象池

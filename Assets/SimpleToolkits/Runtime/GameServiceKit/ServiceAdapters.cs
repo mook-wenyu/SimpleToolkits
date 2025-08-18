@@ -5,7 +5,41 @@ using UnityEngine;
 namespace SimpleToolkits
 {
     /// <summary>
-    /// YooAssetLoader服务适配器
+    /// 对象池管理器服务适配器
+    /// </summary>
+    public class PoolManagerService : IGameService
+    {
+        public string ServiceName => nameof(PoolManager);
+        public bool IsInitialized { get; private set; }
+        public Type[] Dependencies => Array.Empty<Type>();
+
+        /// <summary>
+        /// 对象池管理器实例
+        /// </summary>
+        public PoolManager Target { get; private set; }
+
+        public async UniTask InitializeAsync()
+        {
+            if (IsInitialized) return;
+
+            Target = new PoolManager();
+
+            IsInitialized = true;
+            await UniTask.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+            Target?.Dispose();
+            Target = null;
+            IsInitialized = false;
+        }
+
+        public object GetObject() => Target;
+    }
+
+    /// <summary>
+    /// YooAssetLoader 服务适配器
     /// </summary>
     public class YooAssetLoaderService : IGameService
     {
@@ -45,18 +79,18 @@ namespace SimpleToolkits
     }
 
     /// <summary>
-    /// ConfigData服务适配器
+    /// ConfigManager 服务适配器
     /// </summary>
-    public class ConfigDataService : IGameService
+    public class ConfigManagerService : IGameService
     {
-        public string ServiceName => nameof(ConfigData);
+        public string ServiceName => nameof(ConfigManager);
         public bool IsInitialized { get; private set; }
         public Type[] Dependencies => new[] {typeof(YooAssetLoaderService)};
 
         /// <summary>
-        /// ConfigData 实例
+        /// ConfigManager 实例
         /// </summary>
-        public ConfigData Target { get; private set; }
+        public ConfigManager Target { get; private set; }
 
         public async UniTask InitializeAsync()
         {
@@ -75,7 +109,7 @@ namespace SimpleToolkits
                 throw new InvalidOperationException("YooAssetLoader is not initialized in YooAssetLoaderService.");
             }
 
-            Target = new ConfigData();
+            Target = new ConfigManager();
             await Target.LoadAllAsync(Constants.JsonConfigsAssetTagName);
 
             IsInitialized = true;
@@ -92,24 +126,24 @@ namespace SimpleToolkits
     }
 
     /// <summary>
-    /// Locale服务适配器
+    /// LocaleManager 服务适配器
     /// </summary>
-    public class LocaleService : IGameService
+    public class LocaleManagerService : IGameService
     {
-        public string ServiceName => nameof(Locale);
+        public string ServiceName => nameof(LocaleManager);
         public bool IsInitialized { get; private set; }
-        public Type[] Dependencies => new[] {typeof(ConfigDataService)};
+        public Type[] Dependencies => new[] {typeof(ConfigManagerService)};
 
         /// <summary>
-        /// Locale 实例
+        /// LocaleManager 实例
         /// </summary>
-        public Locale Target { get; private set; }
+        public LocaleManager Target { get; private set; }
 
         public async UniTask InitializeAsync()
         {
             if (IsInitialized) return;
 
-            Target = new Locale();
+            Target = new LocaleManager();
             Target.InitLanguage();
 
             IsInitialized = true;
@@ -127,55 +161,21 @@ namespace SimpleToolkits
     }
 
     /// <summary>
-    /// PoolMgr服务适配器
+    /// SceneKit 服务适配器
     /// </summary>
-    public class PoolMgrService : IGameService
+    public class SceneKitService : IGameService
     {
-        public string ServiceName => nameof(PoolMgr);
-        public bool IsInitialized { get; private set; }
-        public Type[] Dependencies => Array.Empty<Type>();
-
-        /// <summary>
-        /// PoolMgr 实例
-        /// </summary>
-        public PoolMgr Target { get; private set; }
-
-        public async UniTask InitializeAsync()
-        {
-            if (IsInitialized) return;
-
-            Target = new PoolMgr();
-
-            IsInitialized = true;
-            await UniTask.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-            Target?.Clear();
-            Target = null;
-            IsInitialized = false;
-        }
-
-        public object GetObject() => Target;
-    }
-
-    /// <summary>
-    /// SceneBehaviour服务适配器
-    /// </summary>
-    public class SceneBehaviourService : IGameService
-    {
-        public string ServiceName => nameof(SceneComponent);
+        public string ServiceName => nameof(SceneKit);
         public bool IsInitialized { get; private set; }
         public Type[] Dependencies => new[] {typeof(YooAssetLoaderService)};
 
         /// <summary>
-        /// SceneComponent 实例
+        /// SceneKit 实例
         /// </summary>
-        public SceneComponent Target { get; private set; }
+        public SceneKit Target { get; private set; }
         private readonly GameObject _parentGameObject;
 
-        public SceneBehaviourService(GameObject parentGameObject)
+        public SceneKitService(GameObject parentGameObject)
         {
             _parentGameObject = parentGameObject;
         }
@@ -186,7 +186,7 @@ namespace SimpleToolkits
 
             if (!Target)
             {
-                Target = _parentGameObject.AddComponent<SceneComponent>();
+                Target = _parentGameObject.AddComponent<SceneKit>();
             }
 
             IsInitialized = true;
@@ -207,21 +207,21 @@ namespace SimpleToolkits
     }
 
     /// <summary>
-    /// UIBehaviour服务适配器
+    /// UIKit 服务适配器
     /// </summary>
-    public class UIBehaviourService : IGameService
+    public class UIKitService : IGameService
     {
-        public string ServiceName => nameof(UIComponent);
+        public string ServiceName => nameof(UIKit);
         public bool IsInitialized { get; private set; }
-        public Type[] Dependencies => new[] {typeof(PoolMgrService)};
+        public Type[] Dependencies => new[] {typeof(PoolManagerService)};
 
         /// <summary>
-        /// UIComponent 实例
+        /// UIKit 实例
         /// </summary>
-        public UIComponent Target { get; private set; }
+        public UIKit Target { get; private set; }
         private readonly GameObject _parentGameObject;
 
-        public UIBehaviourService(GameObject parentGameObject)
+        public UIKitService(GameObject parentGameObject)
         {
             _parentGameObject = parentGameObject;
         }
@@ -232,7 +232,7 @@ namespace SimpleToolkits
 
             if (!Target)
             {
-                Target = _parentGameObject.AddComponent<UIComponent>();
+                Target = _parentGameObject.AddComponent<UIKit>();
             }
 
             IsInitialized = true;
@@ -253,21 +253,21 @@ namespace SimpleToolkits
     }
 
     /// <summary>
-    /// ConsoleBehaviour服务适配器
+    /// ConsoleKit 服务适配器
     /// </summary>
-    public class ConsoleBehaviourService : IGameService
+    public class ConsoleKitService : IGameService
     {
-        public string ServiceName => nameof(ConsoleComponent);
+        public string ServiceName => nameof(ConsoleKit);
         public bool IsInitialized { get; private set; }
         public Type[] Dependencies => Array.Empty<Type>();
 
         /// <summary>
-        /// ConsoleComponent 实例
+        /// ConsoleKit 实例
         /// </summary>
-        public ConsoleComponent Target { get; private set; }
+        public ConsoleKit Target { get; private set; }
         private readonly GameObject _parentGameObject;
 
-        public ConsoleBehaviourService(GameObject parentGameObject)
+        public ConsoleKitService(GameObject parentGameObject)
         {
             _parentGameObject = parentGameObject;
         }
@@ -278,7 +278,7 @@ namespace SimpleToolkits
 
             if (!Target)
             {
-                Target = _parentGameObject.AddComponent<ConsoleComponent>();
+                Target = _parentGameObject.AddComponent<ConsoleKit>();
             }
 
             IsInitialized = true;
@@ -299,21 +299,21 @@ namespace SimpleToolkits
     }
 
     /// <summary>
-    /// AudioBehaviour服务适配器
+    /// AudioKit 服务适配器
     /// </summary>
-    public class AudioBehaviourService : IGameService
+    public class AudioKitService : IGameService
     {
-        public string ServiceName => nameof(AudioComponent);
+        public string ServiceName => nameof(AudioKit);
         public bool IsInitialized { get; private set; }
         public Type[] Dependencies => new[] {typeof(YooAssetLoaderService)};
 
         /// <summary>
-        /// AudioComponent 实例
+        /// AudioKit 实例
         /// </summary>
-        public AudioComponent Target { get; private set; }
+        public AudioKit Target { get; private set; }
         private readonly GameObject _parentGameObject;
 
-        public AudioBehaviourService(GameObject parentGameObject)
+        public AudioKitService(GameObject parentGameObject)
         {
             _parentGameObject = parentGameObject;
         }
@@ -324,7 +324,7 @@ namespace SimpleToolkits
 
             if (!Target)
             {
-                Target = _parentGameObject.AddComponent<AudioComponent>();
+                Target = _parentGameObject.AddComponent<AudioKit>();
             }
 
             IsInitialized = true;

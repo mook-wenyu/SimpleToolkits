@@ -40,29 +40,32 @@ namespace SimpleToolkits
         /// </summary>
         private void RegisterAllServices()
         {
+            // 注册对象池服务
+            Service.RegisterService(new PoolManagerService());
+
             // 注册资源加载器服务
             Service.RegisterService(new YooAssetLoaderService(Settings));
 
             // 注册配置数据服务
-            Service.RegisterService(new ConfigDataService());
+            Service.RegisterService(new ConfigManagerService());
 
             // 注册本地化服务
-            Service.RegisterService(new LocaleService());
+            Service.RegisterService(new LocaleManagerService());
 
-            // 注册对象池服务
-            Service.RegisterService(new PoolMgrService());
+            // 注册数据管理服务
+            Service.RegisterService(new DataManagerService(Settings));
 
             // 注册场景管理服务
-            Service.RegisterService(new SceneBehaviourService(gameObject));
+            Service.RegisterService(new SceneKitService(gameObject));
 
             // 注册UI管理服务
-            Service.RegisterService(new UIBehaviourService(gameObject));
+            Service.RegisterService(new UIKitService(gameObject));
 
             // 注册控制台服务
-            Service.RegisterService(new ConsoleBehaviourService(gameObject));
+            Service.RegisterService(new ConsoleKitService(gameObject));
 
             // 注册音频服务
-            Service.RegisterService(new AudioBehaviourService(gameObject));
+            Service.RegisterService(new AudioKitService(gameObject));
         }
 
         /// <summary>
@@ -142,7 +145,7 @@ namespace SimpleToolkits
             Service.Dispose();
 
             Settings = null;
-            
+
             TypeReflectionUtility.Clear();
 
             base.OnDestroy();

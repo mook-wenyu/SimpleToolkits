@@ -16,6 +16,10 @@ namespace SimpleToolkits.Editor
         private SerializedProperty _languageExcelFileNameProp;
         private SerializedProperty _csOutputPathProp;
         private SerializedProperty _jsonOutputPathProp;
+        private SerializedProperty _storageTypeProp;
+        private SerializedProperty _enableEncryptionProp;
+        private SerializedProperty _encryptionKeyProp;
+        private SerializedProperty _autoSaveIntervalProp;
 
         private void OnEnable()
         {
@@ -26,6 +30,10 @@ namespace SimpleToolkits.Editor
             _languageExcelFileNameProp = serializedObject.FindProperty("languageExcelFileName");
             _csOutputPathProp = serializedObject.FindProperty("csOutputPath");
             _jsonOutputPathProp = serializedObject.FindProperty("jsonOutputPath");
+            _storageTypeProp = serializedObject.FindProperty("storageType");
+            _enableEncryptionProp = serializedObject.FindProperty("enableEncryption");
+            _encryptionKeyProp = serializedObject.FindProperty("encryptionKey");
+            _autoSaveIntervalProp = serializedObject.FindProperty("autoSaveInterval");
         }
 
         public override void OnInspectorGUI()
@@ -93,6 +101,16 @@ namespace SimpleToolkits.Editor
 
             EditorGUILayout.Space();
 
+            // 存储设置
+            EditorGUILayout.LabelField("存储设置", EditorStyles.boldLabel);
+            // 存储类型
+            EditorGUILayout.PropertyField(_storageTypeProp, new GUIContent("存储类型", "选择存储类型"));
+            // 启用加密
+            EditorGUILayout.PropertyField(_enableEncryptionProp, new GUIContent("启用加密", "是否启用数据加密"));
+            // 加密密钥
+            EditorGUILayout.PropertyField(_encryptionKeyProp, new GUIContent("加密密钥", "加密密钥（留空则使用默认密钥）"));
+            // 自动保存间隔
+            EditorGUILayout.PropertyField(_autoSaveIntervalProp, new GUIContent("自动保存间隔", "自动保存间隔（秒，0表示禁用自动保存）"));
 
             EditorGUILayout.Space();
 

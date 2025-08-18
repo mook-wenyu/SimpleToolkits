@@ -29,14 +29,14 @@ namespace SimpleToolkits
         UniTask InitializeAsync();
 
         /// <summary>
-        /// 销毁服务
-        /// </summary>
-        void Dispose();
-
-        /// <summary>
         /// 获取服务内部封装的具体对象实例
         /// </summary>
         /// <returns>服务内部的具体对象实例</returns>
         object GetObject();
+
+        /// <summary>
+        /// 销毁服务
+        /// </summary>
+        void Dispose();
     }
 }

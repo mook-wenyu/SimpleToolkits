@@ -22,21 +22,9 @@ namespace SimpleToolkits
         /// </summary>
         Popup,
         /// <summary>
-        /// 前置面板（与Pop类似，但可能有特殊用途）
-        /// </summary>
-        Front,
-        /// <summary>
-        /// 顶部导航栏（如标题栏、返回按钮）
-        /// </summary>
-        Top,
-        /// <summary>
         /// 飞行提示（如短暂消息）
         /// </summary>
         FlyTip,
-        /// <summary>
-        /// 剧情面板（如过场动画）
-        /// </summary>
-        Plot,
         /// <summary>
         /// 加载界面
         /// </summary>

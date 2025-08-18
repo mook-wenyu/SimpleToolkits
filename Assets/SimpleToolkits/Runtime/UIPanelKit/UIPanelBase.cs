@@ -11,7 +11,7 @@ namespace SimpleToolkits
     public abstract class UIPanelBase : MonoBehaviour
     {
         // UI管理器引用
-        protected UIComponent uiComponent;
+        protected UIKit uiKit;
 
         // 当前面板状态
         protected UIPanelStateType mStateType = UIPanelStateType.None;
@@ -38,9 +38,9 @@ namespace SimpleToolkits
         /// <summary>
         /// 初始化面板
         /// </summary>
-        public virtual void Init(UIComponent uiMgrr)
+        public virtual void Init(UIKit uiMgrr)
         {
-            this.uiComponent = uiMgrr;
+            this.uiKit = uiMgrr;
             mStateType = UIPanelStateType.Loaded;
             OnInit();
         }
@@ -62,7 +62,7 @@ namespace SimpleToolkits
         public virtual void Hide(bool destroy = false)
         {
             // 通过UI管理器处理面板关闭
-            uiComponent.HidePanel(this, destroy).Forget();
+            uiKit.HidePanel(this, destroy).Forget();
         }
 
         /// <summary>
@@ -74,9 +74,9 @@ namespace SimpleToolkits
             mStateType = UIPanelStateType.Hidden;
 
             // 从正在显示的面板字典中移除
-            if (uiComponent)
+            if (uiKit)
             {
-                _ = uiComponent.RemoveFromOpenedPanels(this);
+                _ = uiKit.RemoveFromOpenedPanels(this);
             }
 
             OnHide();

@@ -21,7 +21,7 @@ namespace SimpleToolkits
         {
             await GSMgr.Instance.Init();
 
-            var configs = GSMgr.Instance.GetObject<ConfigData>().GetAll<ExampleConfig>();
+            var configs = GSMgr.Instance.GetObject<ConfigManager>().GetAll<ExampleConfig>();
             StringBuilder sb = new(configs.Count);
             foreach (var c in configs)
             {
@@ -36,13 +36,13 @@ namespace SimpleToolkits
             _img = GameObject.Find("Image").GetComponent<Image>();
             _img.sprite = await GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("test");
 
-            await GSMgr.Instance.GetObject<UIComponent>().RegisterPanel<UIConfirmPanel>(UILayerType.Popup, true, true);
+            await GSMgr.Instance.GetObject<UIKit>().RegisterPanel<UIConfirmPanel>(UILayerType.Popup, true, true);
 
-            //await UIComponent.Instance.OpenPanel<UIConfirmPanel>();
-            //await UIComponent.Instance.OpenPanel<UIConfirmPanel>();
-            //await UIComponent.Instance.OpenPanel<UIConfirmPanel>();
+            //await UIKit.Instance.OpenPanel<UIConfirmPanel>();
+            //await UIKit.Instance.OpenPanel<UIConfirmPanel>();
+            //await UIKit.Instance.OpenPanel<UIConfirmPanel>();
 
-            var scene = await GSMgr.Instance.GetObject<SceneComponent>().LoadSceneAsync("TestScene");
+            var scene = await GSMgr.Instance.GetObject<SceneKit>().LoadSceneAsync("TestScene");
             await UniTask.Delay(1000);
             Debug.Log(scene.UnSuspend());
             await UniTask.Delay(1000);

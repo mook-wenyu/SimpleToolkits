@@ -24,7 +24,7 @@ namespace SimpleToolkits
             set
             {
                 _currentLanguage = value;
-                var languageIndex = GSMgr.Instance.Settings.SupportedLanguages.FindIndex(l => l.language == value);
+                var languageIndex = GKMgr.Instance.Settings.SupportedLanguages.FindIndex(l => l.language == value);
                 PlayerPrefs.SetInt("CURRENT_LANGUAGE_INDEX", languageIndex);
                 OnLanguageChanged?.Invoke(value);
             }
@@ -34,11 +34,11 @@ namespace SimpleToolkits
         {
             var languageIndex = PlayerPrefs.GetInt("CURRENT_LANGUAGE_INDEX", 0);
 
-            if (languageIndex >= GSMgr.Instance.Settings.SupportedLanguages.Count)
+            if (languageIndex >= GKMgr.Instance.Settings.SupportedLanguages.Count)
             {
                 languageIndex = 0;
             }
-            ChangeLanguage(GSMgr.Instance.Settings.SupportedLanguages[languageIndex].language);
+            ChangeLanguage(GKMgr.Instance.Settings.SupportedLanguages[languageIndex].language);
         }
 
         /// <summary>
@@ -47,7 +47,7 @@ namespace SimpleToolkits
         public void InitLanguage()
         {
             // 获取配置数据
-            var configData = GSMgr.Instance.GetObject<ConfigManager>();
+            var configData = GKMgr.Instance.GetObject<ConfigManager>();
             var type = TypeReflectionUtility.FindType("LanguagesConfig", "Assembly-CSharp");
             if (type == null)
             {
@@ -73,7 +73,7 @@ namespace SimpleToolkits
                 }
 
                 // 查找匹配的语言配置
-                var supportedLanguage = GSMgr.Instance.Settings.SupportedLanguages.Find(l => l.langKey == langKey);
+                var supportedLanguage = GKMgr.Instance.Settings.SupportedLanguages.Find(l => l.langKey == langKey);
 
                 if (!_localeDataDict.ContainsKey(supportedLanguage.language))
                 {

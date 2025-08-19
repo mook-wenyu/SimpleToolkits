@@ -335,9 +335,6 @@ namespace SimpleToolkits
         public void Dispose()
         {
             StopAutoSave();
-            // 注意：Dispose 方法通常是同步的，这里我们使用 .Forget() 来避免阻塞
-            SaveAllAsync().Forget();
-
             ClearAll();
             _configStorage = null;
             _saveStorage = null;

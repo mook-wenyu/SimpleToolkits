@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -8,95 +6,100 @@ namespace SimpleToolkits
 {
     public class AudioKit : MonoBehaviour
     {
-        private AudioSource _musicSource; // 音乐播放器
-        private AudioSource _voiceSource; // 人声播放器
-        private AudioSource _soundSource; // 音效播放器
+        private AudioPlayer _musicPlayer;
+        private AudioPlayer _effectPlayer;
+        private AudioPlayer _voicePlayer;
 
-        private float _musicVolume = 1f; // 音乐音量
-        private float _voiceVolume = 1f; // 人声音量
-        private float _soundVolume = 1f; // 音效音量
+        /// <summary>
+        /// 音乐播放器
+        /// </summary>
+        public IAudioPlayer MusicPlayer => _musicPlayer;
+        
+        /// <summary>
+        /// 音效播放器
+        /// </summary>
+        public IAudioPlayer EffectPlayer => _effectPlayer;
+        
+        /// <summary>
+        /// 人声播放器
+        /// </summary>
+        public IAudioPlayer VoicePlayer => _voicePlayer;
 
         /// <summary>
         /// 当前播放的音乐
         /// </summary>
-        public AudioClip currentMusic;
-        /// <summary>
-        /// 当前播放的人声
-        /// </summary>
-        public AudioClip currentVoice;
+        public AudioClip CurrentMusic => _musicPlayer?.CurrentClip;
+        
         /// <summary>
         /// 当前播放的音效
         /// </summary>
-        public AudioClip currentSound;
-
-        public AudioClip CurrentMusic => currentMusic;
-        public AudioClip CurrentVoice => currentVoice;
-        public AudioClip CurrentSound => currentSound;
+        public AudioClip CurrentEffect => _effectPlayer?.CurrentClip;
+        
+        /// <summary>
+        /// 当前播放的人声
+        /// </summary>
+        public AudioClip CurrentVoice => _voicePlayer?.CurrentClip;
 
         private void Awake()
         {
             gameObject.transform.position = Vector3.zero;
+            InitializeAudioSystem();
+        }
 
-            // 初始化音频
-            if (!_musicSource)
-            {
-                _musicSource = gameObject.AddComponent<AudioSource>();
-            }
-            if (!_voiceSource)
-            {
-                _voiceSource = gameObject.AddComponent<AudioSource>();
-            }
-            if (!_soundSource)
-            {
-                _soundSource = gameObject.AddComponent<AudioSource>();
-            }
+        /// <summary>
+        /// 初始化音频系统
+        /// </summary>
+        private void InitializeAudioSystem()
+        {
+            // 创建3个固定的音频播放器
+            _musicPlayer = CreateAudioPlayer();
+            _musicPlayer.Loop = true; // 音乐默认循环播放
+            
+            _effectPlayer = CreateAudioPlayer();
+            _effectPlayer.Loop = false;
+            
+            _voicePlayer = CreateAudioPlayer();
+            _voicePlayer.Loop = false;
+        }
 
-            // 设置音频源属性
-
-            _musicSource.loop = true;
-            _voiceSource.loop = false;
-            _soundSource.loop = false;
-
-            _musicSource.pitch = 1f;
-            _voiceSource.pitch = 1f;
-            _soundSource.pitch = 1f;
-
-            SetMusicVolume();
-            SetVoiceVolume();
-            SetSoundVolume();
+        /// <summary>
+        /// 创建音频播放器
+        /// </summary>
+        private AudioPlayer CreateAudioPlayer()
+        {
+            var audioSource = gameObject.AddComponent<AudioSource>();
+            var player = new AudioPlayer();
+            player.Initialize(audioSource);
+            return player;
         }
 
         /// <summary>
         /// 播放背景音乐
         /// </summary>
-        /// <param name="music"></param>
+        /// <param name="music">音乐剪辑</param>
         public void PlayMusic(AudioClip music)
         {
-            if (!music) return;
-            _musicSource.clip = music;
-            _musicSource.Play();
-            currentMusic = music;
+            if (music == null) return;
+            _musicPlayer.Play(music);
         }
 
         /// <summary>
         /// 播放背景音乐
         /// </summary>
-        /// <param name="musicPath"></param>
-        public async UniTaskVoid PlayMusic(string musicPath)
+        /// <param name="musicPath">音乐路径</param>
+        public async UniTask PlayMusic(string musicPath)
         {
-            currentMusic = await GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<AudioClip>(musicPath);
-            PlayMusic(currentMusic);
+            if (string.IsNullOrEmpty(musicPath)) return;
+            await _musicPlayer.PlayAsync(musicPath);
         }
 
         /// <summary>
         /// 设置背景音乐音量
         /// </summary>
-        /// <param name="volume"></param>
+        /// <param name="volume">音量值</param>
         public void SetMusicVolume(float volume = 1f)
         {
-            _musicVolume = volume;
-            if (!_musicSource) return;
-            _musicSource.volume = volume;
+            _musicPlayer.Volume = volume;
         }
 
         /// <summary>
@@ -104,8 +107,7 @@ namespace SimpleToolkits
         /// </summary>
         public void PauseMusic()
         {
-            if (!_musicSource) return;
-            _musicSource.Pause();
+            _musicPlayer?.Pause();
         }
 
         /// <summary>
@@ -113,8 +115,7 @@ namespace SimpleToolkits
         /// </summary>
         public void ResumeMusic()
         {
-            if (!_musicSource) return;
-            _musicSource.UnPause();
+            _musicPlayer?.Resume();
         }
 
         /// <summary>
@@ -122,43 +123,73 @@ namespace SimpleToolkits
         /// </summary>
         public void StopMusic()
         {
-            if (!_musicSource) return;
-            _musicSource.Stop();
-            _musicSource.clip = null;
-            currentMusic = null;
+            _musicPlayer?.Stop();
+        }
+
+        /// <summary>
+        /// 播放音效（可重叠）
+        /// </summary>
+        /// <param name="effect">音效剪辑</param>
+        public void PlayEffect(AudioClip effect)
+        {
+            if (effect == null) return;
+            _effectPlayer.PlayOneShot(effect);
+        }
+
+        /// <summary>
+        /// 播放音效（可重叠）
+        /// </summary>
+        /// <param name="effectPath">音效路径</param>
+        public async UniTask PlayEffect(string effectPath)
+        {
+            if (string.IsNullOrEmpty(effectPath)) return;
+            await _effectPlayer.PlayOneShotAsync(effectPath);
+        }
+
+        /// <summary>
+        /// 设置音效音量
+        /// </summary>
+        /// <param name="volume">音量值</param>
+        public void SetEffectVolume(float volume = 1f)
+        {
+            _effectPlayer.Volume = volume;
+        }
+
+        /// <summary>
+        /// 停止所有音效
+        /// </summary>
+        public void StopAllEffects()
+        {
+            _effectPlayer?.Stop();
         }
 
         /// <summary>
         /// 播放人声
         /// </summary>
-        /// <param name="voice"></param>
+        /// <param name="voice">人声剪辑</param>
         public void PlayVoice(AudioClip voice)
         {
-            if (!voice) return;
-            _voiceSource.clip = voice;
-            _voiceSource.Play();
-            currentVoice = voice;
+            if (voice == null) return;
+            _voicePlayer.Play(voice);
         }
 
         /// <summary>
         /// 播放人声
         /// </summary>
-        /// <param name="voicePath"></param>
-        public async UniTaskVoid PlayVoice(string voicePath)
+        /// <param name="voicePath">人声路径</param>
+        public async UniTask PlayVoice(string voicePath)
         {
-            currentVoice = await GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<AudioClip>(voicePath);
-            PlayVoice(currentVoice);
+            if (string.IsNullOrEmpty(voicePath)) return;
+            await _voicePlayer.PlayAsync(voicePath);
         }
 
         /// <summary>
         /// 设置人声音量
         /// </summary>
-        /// <param name="volume"></param>
+        /// <param name="volume">音量值</param>
         public void SetVoiceVolume(float volume = 1f)
         {
-            _voiceVolume = volume;
-            if (!_voiceSource) return;
-            _voiceSource.volume = volume;
+            _voicePlayer.Volume = volume;
         }
 
         /// <summary>
@@ -166,8 +197,7 @@ namespace SimpleToolkits
         /// </summary>
         public void PauseVoice()
         {
-            if (!_voiceSource) return;
-            _voiceSource.Pause();
+            _voicePlayer?.Pause();
         }
 
         /// <summary>
@@ -175,8 +205,7 @@ namespace SimpleToolkits
         /// </summary>
         public void ResumeVoice()
         {
-            if (!_voiceSource) return;
-            _voiceSource.UnPause();
+            _voicePlayer?.Resume();
         }
 
         /// <summary>
@@ -184,84 +213,50 @@ namespace SimpleToolkits
         /// </summary>
         public void StopVoice()
         {
-            if (!_voiceSource) return;
-            _voiceSource.Stop();
-            _voiceSource.clip = null;
-            currentVoice = null;
+            _voicePlayer?.Stop();
         }
 
         /// <summary>
-        /// 播放音效
+        /// 停止所有音频播放
         /// </summary>
-        /// <param name="sound"></param>
-        public void PlaySound(AudioClip sound)
+        public void StopAll()
         {
-            if (!sound) return;
-            _soundSource.clip = sound;
-            _soundSource.Play();
-            currentSound = sound;
+            StopMusic();
+            StopAllEffects();
+            StopVoice();
         }
 
         /// <summary>
-        /// 播放音效
+        /// 暂停所有音频播放
         /// </summary>
-        /// <param name="soundPath"></param>
-        public async UniTaskVoid PlaySound(string soundPath)
+        public void PauseAll()
         {
-            currentSound = await GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<AudioClip>(soundPath);
-            PlaySound(currentSound);
+            PauseMusic();
+            PauseVoice();
         }
 
         /// <summary>
-        /// 设置音效音量
+        /// 恢复所有音频播放
         /// </summary>
-        /// <param name="volume"></param>
-        public void SetSoundVolume(float volume = 1f)
+        public void ResumeAll()
         {
-            _soundVolume = volume;
-            if (!_soundSource) return;
-            _soundSource.volume = volume;
-        }
-
-        /// <summary>
-        /// 暂停音效
-        /// </summary>
-        public void PauseSound()
-        {
-            if (!_soundSource) return;
-            _soundSource.Pause();
-        }
-
-        /// <summary>
-        /// 恢复音效
-        /// </summary>
-        public void ResumeSound()
-        {
-            if (!_soundSource) return;
-            _soundSource.UnPause();
-        }
-
-        /// <summary>
-        /// 停止音效
-        /// </summary>
-        public void StopSound()
-        {
-            if (!_soundSource) return;
-            _soundSource.Stop();
-            _soundSource.clip = null;
+            ResumeMusic();
+            ResumeVoice();
         }
 
         private void OnDestroy()
         {
-            StopMusic();
-            StopVoice();
-            StopSound();
-            _musicSource = null;
-            _voiceSource = null;
-            _soundSource = null;
-            currentMusic = null;
-            currentVoice = null;
-            currentSound = null;
+            StopAll();
+            
+            // 释放播放器资源
+            _musicPlayer?.Dispose();
+            _effectPlayer?.Dispose();
+            _voicePlayer?.Dispose();
+            
+            // 清理引用
+            _musicPlayer = null;
+            _effectPlayer = null;
+            _voicePlayer = null;
         }
     }
 }

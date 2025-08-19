@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -9,134 +8,90 @@ using YooAsset;
 namespace SimpleToolkits
 {
     /// <summary>
+    /// 场景状态
+    /// </summary>
+    public enum SceneStatus
+    {
+        /// <summary>
+        /// 未加载
+        /// </summary>
+        None,
+        /// <summary>
+        /// 加载中
+        /// </summary>
+        Loading,
+        /// <summary>
+        /// 已加载
+        /// </summary>
+        Loaded,
+        /// <summary>
+        /// 卸载中
+        /// </summary>
+        Unloading
+    }
+
+    /// <summary>
+    /// 场景操作
+    /// </summary>
+    public class SceneOperation
+    {
+        public SceneStatus Status { get; set; } = SceneStatus.None;
+        public SceneHandle SceneHandle { get; set; }
+    }
+
+    /// <summary>
     /// 场景管理器
     /// </summary>
     public class SceneKit : MonoBehaviour
     {
-        private sealed class SceneHandleData
-        {
-            public readonly SceneHandle sceneHandle;
-            public readonly object userData;
+        private YooAssetLoader _resKit;
+        private readonly Dictionary<string, SceneOperation> _sceneOperations = new();
 
-            public SceneHandleData(SceneHandle sceneHandle, object userData)
-            {
-                this.sceneHandle = sceneHandle;
-                this.userData = userData;
-            }
-        }
+        /// <summary>
+        /// 场景加载进度事件
+        /// </summary>
+        public event Action<string, float> OnLoadSceneProgress;
 
-        // 加载完成
-        private readonly Dictionary<string, SceneHandle> _loadedSceneAssetNames = new();
-        // 加载中
-        private readonly Dictionary<string, SceneHandleData> _loadingSceneAssetNames = new();
-        // 卸载中
-        private readonly Dictionary<string, SceneHandle> _unloadingSceneAssetNames = new();
         /// <summary>
         /// 场景加载成功事件
         /// </summary>
-        private event Action<string, object> OnLoadSceneSuccess;
+        public event Action<string> OnLoadSceneSuccess;
+
         /// <summary>
         /// 场景加载失败事件
         /// </summary>
-        private event Action<string, EOperationStatus, string, object> OnLoadSceneFailure;
+        public event Action<string, string> OnLoadSceneFailure;
+
         /// <summary>
         /// 场景卸载成功事件
         /// </summary>
-        private event Action<string, object> OnUnloadSceneSuccess;
-        /// <summary>
-        /// 场景卸载失败事件
-        /// </summary>
-        private event Action<string, object> OnUnloadSceneFailure;
+        public event Action<string> OnUnloadSceneSuccess;
 
-        void OnDestroy()
+        private void Awake()
         {
-            string[] loadedSceneAssetNames = _loadedSceneAssetNames.Keys.ToArray();
-            foreach (string loadedSceneAssetName in loadedSceneAssetNames)
+            _resKit = GKMgr.Instance.GetObject<YooAssetLoader>();
+        }
+
+        private void OnDestroy()
+        {
+            foreach (var sceneName in _sceneOperations.Keys)
             {
-                if (SceneIsUnloading(loadedSceneAssetName))
+                if (_sceneOperations[sceneName].Status == SceneStatus.Loaded)
                 {
-                    continue;
+                    UnloadSceneAsync(sceneName).Forget();
                 }
-
-                UnloadScene(loadedSceneAssetName);
             }
-
-            _loadedSceneAssetNames.Clear();
-            _loadingSceneAssetNames.Clear();
-            _unloadingSceneAssetNames.Clear();
+            _sceneOperations.Clear();
         }
 
         /// <summary>
-        /// 获取场景是否已加载
+        /// 获取场景操作
         /// </summary>
         /// <param name="sceneAssetName">场景资源名称</param>
-        /// <returns>场景是否已加载。</returns>
-        public bool SceneIsLoaded(string sceneAssetName)
+        /// <returns>场景操作</returns>
+        public SceneOperation GetSceneOperation(string sceneAssetName)
         {
-            if (!string.IsNullOrEmpty(sceneAssetName))
-            {
-                return _loadedSceneAssetNames.ContainsKey(sceneAssetName);
-            }
-
-            Debug.LogException(new ArgumentNullException(sceneAssetName));
-            return false;
-        }
-
-        /// <summary>
-        /// 获取已加载场景的资源名称
-        /// </summary>
-        /// <returns>已加载场景的资源名称</returns>
-        public string[] GetLoadedSceneAssetNames()
-        {
-            return _loadedSceneAssetNames.Keys.ToArray();
-        }
-
-        /// <summary>
-        /// 获取场景是否正在加载
-        /// </summary>
-        /// <param name="sceneAssetName">场景资源名称</param>
-        /// <returns>场景是否正在加载</returns>
-        public bool SceneIsLoading(string sceneAssetName)
-        {
-            if (!string.IsNullOrEmpty(sceneAssetName))
-            {
-                return _loadingSceneAssetNames.ContainsKey(sceneAssetName);
-            }
-            Debug.LogException(new ArgumentNullException(sceneAssetName));
-            return false;
-        }
-
-        /// <summary>
-        /// 获取正在加载场景的资源名称
-        /// </summary>
-        /// <returns>正在加载场景的资源名称</returns>
-        public string[] GetLoadingSceneAssetNames()
-        {
-            return _loadingSceneAssetNames.Keys.ToArray();
-        }
-
-        /// <summary>
-        /// 获取场景是否正在卸载
-        /// </summary>
-        /// <param name="sceneAssetName">场景资源名称</param>
-        /// <returns>场景是否正在卸载</returns>
-        public bool SceneIsUnloading(string sceneAssetName)
-        {
-            if (!string.IsNullOrEmpty(sceneAssetName))
-            {
-                return _unloadingSceneAssetNames.ContainsKey(sceneAssetName);
-            }
-            Debug.LogException(new ArgumentNullException(sceneAssetName));
-            return false;
-        }
-
-        /// <summary>
-        /// 获取正在卸载场景的资源名称
-        /// </summary>
-        /// <returns>正在卸载场景的资源名称</returns>
-        public string[] GetUnloadingSceneAssetNames()
-        {
-            return _unloadingSceneAssetNames.Keys.ToArray();
+            return _sceneOperations.GetValueOrDefault(sceneAssetName, null);
         }
 
         /// <summary>
@@ -144,134 +99,97 @@ namespace SimpleToolkits
         /// </summary>
         /// <param name="sceneAssetName">场景资源名称</param>
         /// <param name="sceneMode">加载场景的方式</param>
-        public UniTask<SceneHandle> LoadSceneAsync(string sceneAssetName, LoadSceneMode sceneMode = LoadSceneMode.Single)
-        {
-            return LoadSceneAsync(sceneAssetName, sceneMode, null);
-        }
-
-        /// <summary>
-        /// 异步加载场景
-        /// </summary>
-        /// <param name="sceneAssetName">场景资源名称</param>
-        /// <param name="userData">用户自定义数据</param>
-        public UniTask<SceneHandle> LoadSceneAsync(string sceneAssetName, object userData)
-        {
-            return LoadSceneAsync(sceneAssetName, LoadSceneMode.Single, userData);
-        }
-
-        /// <summary>
-        /// 异步加载场景
-        /// </summary>
-        /// <param name="sceneAssetName">场景资源名称</param>
-        /// <param name="sceneMode">加载场景的方式</param>
-        /// <param name="userData">用户自定义数据</param>
-        public async UniTask<SceneHandle> LoadSceneAsync(string sceneAssetName, LoadSceneMode sceneMode, object userData)
+        /// <param name="suspendLoad">场景加载到90%自动挂起</param>
+        public async UniTask LoadSceneAsync(string sceneAssetName, LoadSceneMode sceneMode = LoadSceneMode.Single, bool suspendLoad = true)
         {
             if (string.IsNullOrEmpty(sceneAssetName))
             {
-                Debug.LogException(new ArgumentNullException(sceneAssetName));
-                return null;
+                throw new ArgumentNullException(nameof(sceneAssetName));
             }
 
-            if (SceneIsUnloading(sceneAssetName))
+            if (_sceneOperations.TryGetValue(sceneAssetName, out var existingOperation) && existingOperation.Status != SceneStatus.None)
             {
-                Debug.LogException(new Exception($"Scene asset '{sceneAssetName}' is being unloaded."));
-                return null;
-            }
-
-            if (SceneIsLoading(sceneAssetName))
-            {
-                Debug.LogException(new Exception($"Scene asset '{sceneAssetName}' is being loaded."));
-                return null;
-            }
-
-            if (SceneIsLoaded(sceneAssetName))
-            {
-                Debug.LogException(new Exception($"Scene asset '{sceneAssetName}' is already loaded."));
-                return null;
-            }
-
-            var sceneOperationHandle = GSMgr.Instance.GetObject<YooAssetLoader>().LoadSceneAsync(sceneAssetName, sceneMode, LocalPhysicsMode.None, true);
-            _loadingSceneAssetNames.Add(sceneAssetName, new SceneHandleData(sceneOperationHandle, userData));
-            sceneOperationHandle.Completed += OnLoadSceneCompleted;
-            return sceneOperationHandle;
-        }
-
-        private void OnLoadSceneCompleted(SceneHandle sceneOperationHandle)
-        {
-            _loadedSceneAssetNames.Add(sceneOperationHandle.GetAssetInfo().AssetPath, sceneOperationHandle);
-            _loadingSceneAssetNames.Remove(sceneOperationHandle.GetAssetInfo().AssetPath, out var value);
-
-            if (value == null) return;
-
-            if (sceneOperationHandle.IsDone)
-            {
-                _loadingSceneAssetNames.Remove(sceneOperationHandle.SceneName);
-                OnLoadSceneSuccess?.Invoke(sceneOperationHandle.SceneName, value.userData);
-            }
-            else
-            {
-                _loadingSceneAssetNames.Remove(sceneOperationHandle.SceneName);
-                var appendErrorMessage = $"Load scene failure, scene asset name '{sceneOperationHandle.SceneName}', status '{sceneOperationHandle.Status}', error message '{sceneOperationHandle.LastError}'.";
-                OnLoadSceneFailure?.Invoke(sceneOperationHandle.SceneName, sceneOperationHandle.Status, appendErrorMessage, value.userData);
-                Debug.LogException(new Exception(appendErrorMessage));
-            }
-        }
-
-        /// <summary>
-        /// 卸载场景
-        /// </summary>
-        /// <param name="sceneAssetName">场景资源名称</param>
-        /// <param name="userData">用户自定义数据</param>
-        public void UnloadScene(string sceneAssetName, object userData = null)
-        {
-            if (string.IsNullOrEmpty(sceneAssetName))
-            {
-                Debug.LogException(new ArgumentNullException(sceneAssetName));
+                Debug.LogWarning($"Scene '{sceneAssetName}' is already in state '{existingOperation.Status}'.");
                 return;
             }
 
-            if (SceneIsUnloading(sceneAssetName))
+            var operation = new SceneOperation {Status = SceneStatus.Loading};
+            _sceneOperations[sceneAssetName] = operation;
+
+            try
             {
-                Debug.LogException(new Exception($"Scene asset '{sceneAssetName}' is being unloaded."));
-                return;
-            }
+                var handle = _resKit.LoadSceneAsync(sceneAssetName, sceneMode, LocalPhysicsMode.None, suspendLoad);
+                operation.SceneHandle = handle;
 
-            if (SceneIsLoading(sceneAssetName))
-            {
-                Debug.LogException(new Exception($"Scene asset '{sceneAssetName}' is being loaded."));
-                return;
-            }
+                MonitorLoadingProgress(sceneAssetName, handle).Forget();
 
-            if (!SceneIsLoaded(sceneAssetName))
-            {
-                Debug.LogException(new Exception($"Scene asset '{sceneAssetName}' is not loaded yet."));
-                return;
-            }
+                await handle.ToUniTask();
 
-            if (!_loadedSceneAssetNames.TryGetValue(sceneAssetName, out var sceneOperationHandle)) return;
-
-            var unloadSceneOperationHandle = sceneOperationHandle.UnloadAsync();
-            _loadedSceneAssetNames.Remove(sceneAssetName);
-            _unloadingSceneAssetNames.Add(sceneAssetName, sceneOperationHandle);
-
-            unloadSceneOperationHandle.Completed += OnUnloadSceneOperationHandleOnCompleted;
-            return;
-
-            void OnUnloadSceneOperationHandleOnCompleted(AsyncOperationBase asyncOperationBase)
-            {
-                if (asyncOperationBase.IsDone)
+                if (handle.Status == EOperationStatus.Succeed)
                 {
-                    _unloadingSceneAssetNames.Remove(sceneAssetName);
-                    _loadedSceneAssetNames.Remove(sceneAssetName);
-                    OnUnloadSceneSuccess?.Invoke(sceneAssetName, userData);
+                    operation.Status = SceneStatus.Loaded;
+                    OnLoadSceneSuccess?.Invoke(sceneAssetName);
                 }
                 else
                 {
-                    _unloadingSceneAssetNames.Remove(sceneAssetName);
-                    OnUnloadSceneFailure?.Invoke(sceneAssetName, userData);
-                    Debug.LogException(new Exception($"Unload scene failure, scene asset name '{sceneAssetName}'."));
+                    throw new Exception(handle.LastError);
                 }
+            }
+            catch (Exception e)
+            {
+                _sceneOperations.Remove(sceneAssetName);
+                var errorMessage = $"Failed to load scene '{sceneAssetName}': {e.Message}";
+                OnLoadSceneFailure?.Invoke(sceneAssetName, errorMessage);
+                Debug.LogException(new Exception(errorMessage, e));
+            }
+        }
+
+        /// <summary>
+        /// 监听场景加载进度
+        /// </summary>
+        /// <param name="sceneName">场景名称</param>
+        /// <param name="handle">场景加载句柄</param>
+        private async UniTaskVoid MonitorLoadingProgress(string sceneName, SceneHandle handle)
+        {
+            if (handle == null) return;
+
+            while (!handle.IsDone)
+            {
+                OnLoadSceneProgress?.Invoke(sceneName, handle.Progress);
+                await UniTask.Yield();
+            }
+            OnLoadSceneProgress?.Invoke(sceneName, 1f);
+        }
+
+        /// <summary>
+        /// 异步卸载场景
+        /// </summary>
+        /// <param name="sceneAssetName">场景资源名称</param>
+        public async UniTask UnloadSceneAsync(string sceneAssetName)
+        {
+            if (string.IsNullOrEmpty(sceneAssetName))
+            {
+                throw new ArgumentNullException(nameof(sceneAssetName));
+            }
+
+            if (!_sceneOperations.TryGetValue(sceneAssetName, out var operation) || operation.Status != SceneStatus.Loaded)
+            {
+                Debug.LogWarning($"Scene '{sceneAssetName}' is not loaded or in a transient state.");
+                return;
+            }
+
+            operation.Status = SceneStatus.Unloading;
+
+            try
+            {
+                await operation.SceneHandle.UnloadAsync();
+                _sceneOperations.Remove(sceneAssetName);
+                OnUnloadSceneSuccess?.Invoke(sceneAssetName);
+            }
+            catch (Exception e)
+            {
+                operation.Status = SceneStatus.Loaded;
+                Debug.LogException(new Exception($"Failed to unload scene '{sceneAssetName}': {e.Message}", e));
             }
         }
     }

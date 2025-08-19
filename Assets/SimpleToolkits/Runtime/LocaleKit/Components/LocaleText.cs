@@ -25,7 +25,7 @@ namespace SimpleToolkits
         /// <param name="key">语言键</param>
         public void UpdateText(string key)
         {
-            SetText(GSMgr.Instance.GetObject<LocaleManager>()[key]);
+            SetText(GKMgr.Instance.GetObject<LocaleManager>()[key]);
         }
 
         private void SetText(string text)

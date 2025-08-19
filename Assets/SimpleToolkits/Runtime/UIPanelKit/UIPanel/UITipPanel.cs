@@ -101,10 +101,10 @@ namespace SimpleToolkits
 
         private void LoadIcons()
         {
-            //GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_normal", sprite => _iconNormal = sprite).Forget();
-            //GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_success", sprite => _iconSuccess = sprite).Forget();
-            //GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_warning", sprite => _iconWarning = sprite).Forget();
-            //GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_error", sprite => _iconError = sprite).Forget();
+            //GKMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_normal", sprite => _iconNormal = sprite).Forget();
+            //GKMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_success", sprite => _iconSuccess = sprite).Forget();
+            //GKMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_warning", sprite => _iconWarning = sprite).Forget();
+            //GKMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<Sprite>("tip_icon_error", sprite => _iconError = sprite).Forget();
         }
 
         protected override void OnShow(object args)

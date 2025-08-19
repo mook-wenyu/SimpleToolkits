@@ -35,7 +35,7 @@ namespace SimpleToolkits
         #region 初始化
         private void Awake()
         {
-            _poolManager = GSMgr.Instance.GetServiceObject<PoolManagerService, PoolManager>();
+            _poolManager = GKMgr.Instance.GetObject<PoolManager>();
             if (_poolManager == null)
             {
                 Debug.LogError("PoolManager未初始化，无法创建UI管理器");
@@ -135,7 +135,7 @@ namespace SimpleToolkits
             var prefabPath = typeof(T).Name;
 
             // 加载预制体
-            var prefab = await GSMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<GameObject>(prefabPath);
+            var prefab = await GKMgr.Instance.GetObject<YooAssetLoader>().LoadAssetAsync<GameObject>(prefabPath);
             if (!prefab)
             {
                 Debug.LogError($"加载UI预制体失败: {typeof(T).Name}, 路径: {prefabPath}");

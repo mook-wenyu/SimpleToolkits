@@ -31,14 +31,23 @@ MonoBehaviour:
     m_Url: https://package.openupm.com
     m_Scopes:
     - com.tuyoogame.yooasset
+    - com.github-glitchenzo.nugetforunity
     m_IsDefault: 0
     m_Capabilities: 0
     m_ConfigSource: 4
-  m_UserSelectedRegistryName: package.openupm.com
+  - m_Id: scoped:project:npm
+    m_Name: npm
+    m_Url: https://registry.npmjs.org
+    m_Scopes:
+    - com.kyrylokuzyk
+    m_IsDefault: 0
+    m_Capabilities: 0
+    m_ConfigSource: 4
+  m_UserSelectedRegistryName: npm
   m_UserAddingNewScopedRegistry: 0
   m_RegistryInfoDraft:
     m_Modified: 0
     m_ErrorMessage: 
-    m_UserModificationsInstanceId: -838
-    m_OriginalInstanceId: -840
+    m_UserModificationsInstanceId: -834
+    m_OriginalInstanceId: -838
   m_LoadAssets: 0

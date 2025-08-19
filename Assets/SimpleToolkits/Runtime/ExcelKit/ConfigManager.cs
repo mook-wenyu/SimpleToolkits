@@ -20,7 +20,7 @@ namespace SimpleToolkits
 
         public async UniTask LoadAllAsync(string jsonPath, Action<bool> onCompleted = null)
         {
-            var jsonConfigs = await GSMgr.Instance.GetObject<YooAssetLoader>().LoadAllAssetAsync<TextAsset>(jsonPath);
+            var jsonConfigs = await GKMgr.Instance.GetObject<YooAssetLoader>().LoadAllAssetAsync<TextAsset>(jsonPath);
             foreach (var jsonConfig in jsonConfigs)
             {
                 var config = JsonConvert.DeserializeObject<Dictionary<string, BaseConfig>>(jsonConfig.text, _jsonSerializerSettings);

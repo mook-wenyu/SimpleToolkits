@@ -1,0 +1,41 @@
+{
+  "name": "com.wenyu.simpletoolkits",
+  "displayName": "Simple Toolkits",
+  "author": {
+    "name": "WenYu",
+    "email": "1317578863@qq.com",
+    "url": "https://github.com/mook-wenyu"
+  },
+  "version": "0.1.0",
+  "unity": "2021.3",
+  "description": "Simple Toolkits",
+  "keywords": [
+    "gameplay",
+    "tools"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
+    "com.kyrylokuzyk.primetween": "1.3.3",
+    "com.tuyoogame.yooasset": "2.3.14",
+    "com.github-glitchenzo.nugetforunity": "4.5.0"
+  },
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.tuyoogame.yooasset",
+        "com.github-glitchenzo.nugetforunity"
+      ]
+    },
+    {
+      "name": "npm",
+      "url": "https://registry.npmjs.org/",
+      "scopes": [
+        "com.kyrylokuzyk"
+      ]
+    }
+  ]
+}

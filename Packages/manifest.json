@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
+    "com.github-glitchenzo.nugetforunity": "4.5.0",
     "com.kyrylokuzyk.primetween": "file:../Assets/Plugins/PrimeTween/internal/com.kyrylokuzyk.primetween.tgz",
     "com.tuyoogame.yooasset": "2.3.14",
     "com.unity.collab-proxy": "2.8.2",
@@ -52,7 +53,15 @@
       "name": "package.openupm.com",
       "url": "https://package.openupm.com",
       "scopes": [
-        "com.tuyoogame.yooasset"
+        "com.tuyoogame.yooasset",
+        "com.github-glitchenzo.nugetforunity"
+      ]
+    },
+    {
+      "name": "npm",
+      "url": "https://registry.npmjs.org/",
+      "scopes": [
+        "com.kyrylokuzyk"
       ]
     }
   ]

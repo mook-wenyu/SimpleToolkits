@@ -11,6 +11,8 @@ namespace SimpleToolkits
     public class Test : MonoBehaviour
     {
         private Image _img;
+        // 活动队列示例
+        private ActivityQueue _activityQueue;
 
         // ========================= FSM 示例相关 =========================
         // 使用 FSMManager 统一驱动 FiniteStateMachine<Test>
@@ -56,7 +58,16 @@ namespace SimpleToolkits
 
 
             // 初始化 FSM（与业务初始化独立）
-            SetupFSM();
+            // SetupFSM();
+
+            GKMgr.Instance.GetObject<ConsoleKit>().RegisterCommand("show_tip", "显示提示", (args) =>
+            {
+                GKMgr.Instance.GetObject<FlyTipManager>().Show(args[0]);
+            });
+            GKMgr.Instance.GetObject<ConsoleKit>().RegisterQuickButton("显示提示", "show_tip", new[] {"测试"});
+
+            // 启动活动队列示例
+            SetupActivityQueue();
 
             /*var scene = GKMgr.Instance.GetObject<SceneKit>();
             scene.OnLoadSceneProgress += (s, f) =>
@@ -91,13 +102,18 @@ namespace SimpleToolkits
 
         private void OnDestroy()
         {
-            if (_fsmMgr != null && _fsm != null)
+            // 释放活动队列
+            if (_activityQueue != null)
             {
-                _fsmMgr.Unregister(_fsm);
-                _fsmMgr.Dispose();
-                _fsmMgr = null;
-                _fsm = null;
+                _activityQueue.Dispose();
+                _activityQueue = null;
             }
+
+            if (_fsmMgr == null || _fsm == null) return;
+            _fsmMgr.Unregister(_fsm);
+            _fsmMgr.Dispose();
+            _fsmMgr = null;
+            _fsm = null;
         }
 
         // ========================= FSM 构建 =========================
@@ -125,6 +141,44 @@ namespace SimpleToolkits
 
             // 注册到 FSMManager，统一调度
             _fsmMgr.Register(_fsm);
+        }
+
+        // ========================= ActivityQueue 示例 =========================
+        private void SetupActivityQueue()
+        {
+            // 创建队列并订阅事件（用于观察执行过程）
+            _activityQueue = new ActivityQueue();
+            _activityQueue.OnActivityStart += a => Debug.Log($"[AQ] Start: {a.GetType().Name}");
+            _activityQueue.OnActivityComplete += a => Debug.Log($"[AQ] Complete: {a.GetType().Name}");
+            _activityQueue.OnQueueComplete += () => Debug.Log("[AQ] Queue Complete");
+
+            // 1) 立即回调：显示开始提示
+            _activityQueue.Enqueue(new CallbackActivity(() =>
+            {
+                GKMgr.Instance.GetObject<FlyTipManager>().Show("队列开始", 1f);
+            }));
+
+            // 2) 延迟 1 秒
+            _activityQueue.Enqueue(new DelayActivity(1f));
+
+            // 3) 异步回调：0.5 秒后再提示
+            _activityQueue.Enqueue(new AsyncCallbackActivity(async ct =>
+            {
+                await UniTask.Delay(TimeSpan.FromSeconds(0.5f), cancellationToken: ct);
+                GKMgr.Instance.GetObject<FlyTipManager>().Show("0.5 秒后", 1f);
+            }));
+
+            // 4) 条件等待：直到 _img 可用（最多等待 2 秒）
+            _activityQueue.Enqueue(new WaitUntilActivity(() => _img != null, timeout: 2f));
+
+            // 5) 收尾提示
+            _activityQueue.Enqueue(new CallbackActivity(() =>
+            {
+                GKMgr.Instance.GetObject<FlyTipManager>().Show("队列结束", 1f);
+            }));
+
+            // 启动执行
+            _activityQueue.Start();
         }
 
         // ========================= 状态实现（作为嵌套类，直接访问 Test 的字段） =========================

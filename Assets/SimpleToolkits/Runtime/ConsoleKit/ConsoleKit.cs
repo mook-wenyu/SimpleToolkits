@@ -210,7 +210,7 @@ namespace SimpleToolkits
             GUI.SetNextControlName("CommandInput");
 
             // 先处理键盘事件，在TextField之前
-            bool shouldExecuteCommand = false;
+            var shouldExecuteCommand = false;
             if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return)
             {
                 // 检查当前焦点是否在输入框上
@@ -221,7 +221,7 @@ namespace SimpleToolkits
                 }
             }
 
-            string newInputText = GUILayout.TextField(_inputText, _inputFieldStyle);
+            var newInputText = GUILayout.TextField(_inputText, _inputFieldStyle);
 
             // 处理输入框内容变化
             if (newInputText != _inputText)
@@ -268,14 +268,13 @@ namespace SimpleToolkits
             const float buttonSpacing = 5f;
             const float maxButtonWidth = 100f;
 
-            float windowWidth = _windowRect.width - 20f; // 减去窗口边距
+            var windowWidth = _windowRect.width - 20f; // 减去窗口边距
             var currentLineWidth = 0f;
             var buttonsInCurrentLine = 0;
 
-            for (var i = 0; i < _quickButtons.Count; i++)
+            foreach (var button in _quickButtons)
             {
-                var button = _quickButtons[i];
-                float buttonWidth = Mathf.Min(maxButtonWidth, GUI.skin.button.CalcSize(new GUIContent(button.buttonText)).x + 10f);
+                var buttonWidth = Mathf.Min(maxButtonWidth, GUI.skin.button.CalcSize(new GUIContent(button.buttonText)).x + 10f);
 
                 // 检查是否需要换行
                 if (buttonsInCurrentLine > 0 && currentLineWidth + buttonWidth + buttonSpacing > windowWidth)
@@ -318,7 +317,7 @@ namespace SimpleToolkits
                 try
                 {
                     // 显示执行的命令
-                    string commandText = buttonInfo.commandName;
+                    var commandText = buttonInfo.commandName;
                     if (buttonInfo.args.Length > 0)
                     {
                         commandText += " " + string.Join(" ", buttonInfo.args);
@@ -379,7 +378,7 @@ namespace SimpleToolkits
             if (string.IsNullOrEmpty(input.Trim()))
                 return;
 
-            if (ParseCommand(input, out string commandName, out string[] args))
+            if (ParseCommand(input, out var commandName, out var args))
             {
                 if (_registeredCommands.TryGetValue(commandName, out var commandInfo))
                 {
@@ -414,7 +413,7 @@ namespace SimpleToolkits
             if (string.IsNullOrEmpty(input))
                 return false;
 
-            string[] parts = input.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var parts = input.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0)
                 return false;
 
@@ -429,7 +428,7 @@ namespace SimpleToolkits
         }
 
         /// <summary>
-        /// 注册快捷按钮
+        /// 注册控制台快捷按钮
         /// </summary>
         /// <param name="buttonText">按钮显示文本</param>
         /// <param name="commandName">要执行的命令名称</param>
@@ -534,7 +533,7 @@ namespace SimpleToolkits
                 return;
             }
 
-            string message = string.Join(" ", args);
+            var message = string.Join(" ", args);
             Debug.Log(message);
         }
         #endregion

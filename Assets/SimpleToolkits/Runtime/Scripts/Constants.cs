@@ -20,5 +20,10 @@ namespace SimpleToolkits
         /// Json 配置资源标签名称
         /// </summary>
         public const string JsonConfigsAssetTagName = "JsonConfigs";
+
+        /// <summary>
+        /// 默认存档名称（不可删除）
+        /// </summary>
+        public const string DefaultSaveName = "AutoSave";
     }
 }

@@ -9,7 +9,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 统一的配置和存档管理器
     /// </summary>
-    public class DataManager : IDisposable
+    public class DataStorageManager : IDisposable
     {
         private readonly SimpleToolkitsSettings _settings;
 
@@ -21,11 +21,6 @@ namespace SimpleToolkits
         /// 当前存档名称
         /// </summary>
         private string _currentSaveName = "AutoSave";
-
-        /// <summary>
-        /// 默认存档名称（不可删除）
-        /// </summary>
-        public const string DefaultSaveName = "AutoSave";
 
         /// <summary>
         /// 配置存储
@@ -66,7 +61,7 @@ namespace SimpleToolkits
         /// 构造函数
         /// </summary>
         /// <param name="settings">SimpleToolkits设置</param>
-        public DataManager(SimpleToolkitsSettings settings = null)
+        public DataStorageManager(SimpleToolkitsSettings settings = null)
         {
             _settings = settings;
         }
@@ -86,20 +81,20 @@ namespace SimpleToolkits
 
             if (_configStorage == null || _saveStorage == null)
             {
-                Debug.LogError("[DataManager] 创建存储实例失败");
+                Debug.LogError("[DataStorageManager] 创建存储实例失败");
                 return false;
             }
 
             // 初始化存储
             if (!_configStorage.Initialize(_settings))
             {
-                Debug.LogError("[DataManager] 初始化配置存储失败");
+                Debug.LogError("[DataStorageManager] 初始化配置存储失败");
                 return false;
             }
 
             if (!_saveStorage.Initialize(_settings))
             {
-                Debug.LogError("[DataManager] 初始化存档存储失败");
+                Debug.LogError("[DataStorageManager] 初始化存档存储失败");
                 return false;
             }
 
@@ -181,7 +176,7 @@ namespace SimpleToolkits
         {
             if (string.IsNullOrEmpty(saveName))
             {
-                Debug.LogError("[DataManager] 存档名称不能为空");
+                Debug.LogError("[DataStorageManager] 存档名称不能为空");
                 return false;
             }
 
@@ -205,7 +200,7 @@ namespace SimpleToolkits
         {
             if (string.IsNullOrEmpty(saveName))
             {
-                Debug.LogError("[DataManager] 存档名称不能为空");
+                Debug.LogError("[DataStorageManager] 存档名称不能为空");
                 return false;
             }
 
@@ -220,7 +215,7 @@ namespace SimpleToolkits
         {
             if (string.IsNullOrEmpty(saveName))
             {
-                Debug.LogError("[DataManager] 存档名称不能为空");
+                Debug.LogError("[DataStorageManager] 存档名称不能为空");
                 return false;
             }
 
@@ -240,14 +235,14 @@ namespace SimpleToolkits
         {
             if (string.IsNullOrEmpty(saveName))
             {
-                Debug.LogError("[DataManager] 存档名称不能为空");
+                Debug.LogError("[DataStorageManager] 存档名称不能为空");
                 return false;
             }
 
             // 检查是否尝试删除受保护的存档
-            if (saveName == DefaultSaveName || saveName == _currentSaveName)
+            if (saveName == Constants.DefaultSaveName || saveName == _currentSaveName)
             {
-                Debug.LogError("[DataManager] 无法删除受保护的存档");
+                Debug.LogError("[DataStorageManager] 无法删除受保护的存档");
                 return false;
             }
 
@@ -303,7 +298,7 @@ namespace SimpleToolkits
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[DataManager] 自动保存任务异常: {ex.Message}");
+                Debug.LogError($"[DataStorageManager] 自动保存任务异常: {ex.Message}");
             }
         }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace SimpleToolkits
@@ -204,7 +205,7 @@ namespace SimpleToolkits
         /// <summary>
         /// 可释放的 Queue 句柄
         /// </summary>
-        public readonly struct PooledQueue : System.IDisposable
+        public readonly struct PooledQueue : IDisposable
         {
             private readonly Queue<T> _queue;
 
@@ -295,7 +296,7 @@ namespace SimpleToolkits
         /// <summary>
         /// 可释放的 Stack 句柄
         /// </summary>
-        public readonly struct PooledStack : System.IDisposable
+        public readonly struct PooledStack : IDisposable
         {
             private readonly Stack<T> _stack;
 

@@ -224,13 +224,13 @@ namespace SimpleToolkits
         /// <typeparam name="T">面板类型</typeparam>
         /// <param name="args">传递给面板的参数</param>
         /// <returns>面板实例</returns>
-        public async UniTask<T> OpenPanel<T>(object args = null) where T : UIPanelBase
+        public T OpenPanel<T>(object args = null) where T : UIPanelBase
         {
             // 获取面板配置信息
             var panelInfo = GetPanelConfig<T>();
 
             // 使用配置信息打开面板
-            return await OpenPanelInternal<T>(args, panelInfo);
+            return OpenPanelInternal<T>(args, panelInfo);
         }
 
         /// <summary>
@@ -240,7 +240,7 @@ namespace SimpleToolkits
         /// <param name="args">传递给面板的参数</param>
         /// <param name="info">部分配置信息，只需要设置需要自定义的属性</param>
         /// <returns>面板实例</returns>
-        public async UniTask<T> OpenPanel<T>(object args, UIPanelInfo info) where T : UIPanelBase
+        public T OpenPanel<T>(object args, UIPanelInfo info) where T : UIPanelBase
         {
             // 获取默认配置
             var defaultConfig = GetPanelConfig<T>();
@@ -250,7 +250,7 @@ namespace SimpleToolkits
             mergedConfig.MergeFrom(in info);
 
             // 使用合并后的配置打开面板
-            return await OpenPanelInternal<T>(args, mergedConfig);
+            return OpenPanelInternal<T>(args, mergedConfig);
         }
 
         /// <summary>
@@ -285,15 +285,8 @@ namespace SimpleToolkits
         /// <typeparam name="T">面板类型</typeparam>
         /// <param name="args">传递给面板的参数</param>
         /// <param name="panelInfo">面板配置信息</param>
-        private async UniTask<T> OpenPanelInternal<T>(object args, UIPanelInfo panelInfo) where T : UIPanelBase
+        private T OpenPanelInternal<T>(object args, UIPanelInfo panelInfo) where T : UIPanelBase
         {
-            // 如果正在播放动画，则忽略重复操作
-            if (_isPlayingAnim)
-            {
-                Debug.Log($"正在播放UI动画，忽略打开面板请求: {typeof(T).Name}");
-                return null;
-            }
-
             var panelName = typeof(T).Name;
 
             // TODO: 音效
@@ -348,14 +341,15 @@ namespace SimpleToolkits
                 CreatePanelMask(panel, panelInfo.closeByOutside.ToBool());
             }
 
-            // 播放打开动画
-            await PlayPanelAnimation(panel, panelInfo.animType, true);
-
             // 显示面板
             panel.Show(args);
 
             // 管理UI栈（默认添加到栈中）
             _uiStack.Push(panel);
+
+            // 播放打开动画
+            PlayPanelAnimation(panel, panelInfo.animType, true).Forget();
+
 #if UNITY_EDITOR
             Debug.Log($"面板 {panel.PanelName}({panel.UniqueId}) 已显示");
 #endif
@@ -390,11 +384,7 @@ namespace SimpleToolkits
                 Debug.Log($"面板已隐藏，忽略重复隐藏请求: {panel.PanelName}({panel.UniqueId})");
                 return;
             }
-            if (_isPlayingAnim)
-            {
-                Debug.Log($"正在播放UI动画，忽略隐藏面板请求: {panel.PanelName}");
-                return;
-            }
+
             // 标记面板为正在隐藏状态
             _hidingPanels.Add(panel.UniqueId);
 

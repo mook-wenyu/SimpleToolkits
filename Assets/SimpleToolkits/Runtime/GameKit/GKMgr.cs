@@ -54,13 +54,15 @@ namespace SimpleToolkits
             localeMgr.InitLanguage();
             await Kit.RegisterKit(localeMgr);
 
-            var dataMgr = new DataManager(Settings);
+            var dataMgr = new DataStorageManager(Settings);
             await dataMgr.InitializeAsync();
             await Kit.RegisterKit(dataMgr);
 
             // MonoBehaviour 组件类（挂到当前 GameObject）
             await Kit.RegisterMonoKit<SceneKit>(gameObject);
             await Kit.RegisterMonoKit<UIKit>(gameObject);
+            await Kit.RegisterMonoKit<FlyTipManager>(gameObject);
+            await Kit.GetObject<FlyTipManager>().Init();
             await Kit.RegisterMonoKit<ConsoleKit>(gameObject);
             await Kit.RegisterMonoKit<AudioKit>(gameObject);
 

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,8 +12,12 @@ namespace SimpleToolkits
     public class Test : MonoBehaviour
     {
         private Image _img;
+        public ScrollView scrollView;
         // 活动队列示例
         private ActivityQueue _activityQueue;
+
+        // 示例：不定长文本数据源
+        private readonly System.Collections.Generic.List<string> _texts = new System.Collections.Generic.List<string>();
 
         // ========================= FSM 示例相关 =========================
         // 使用 FSMManager 统一驱动 FiniteStateMachine<Test>
@@ -67,7 +72,76 @@ namespace SimpleToolkits
             GKMgr.Instance.GetObject<ConsoleKit>().RegisterQuickButton("显示提示", "show_tip", new[] {"测试"});
 
             // 启动活动队列示例
-            SetupActivityQueue();
+            //SetupActivityQueue();
+
+            var go = new GameObject();
+            go.AddComponent<RectTransform>();
+            go.AddComponent<CanvasRenderer>();
+            go.AddComponent<Image>();
+            var child = new GameObject();
+            child.AddComponent<RectTransform>();
+            child.AddComponent<CanvasRenderer>();
+            child.AddComponent<TextMeshProUGUI>();
+            child.GetComponentInChildren<TextMeshProUGUI>().alignment = TextAlignmentOptions.Center;
+            child.transform.SetParent(go.transform, false);
+            var rt = go.GetComponent<RectTransform>();
+            // 关键：父项横向拉伸，顶部对齐；给定一个合理的默认高度（主轴）
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(0f, 60f); // 宽跟随视口，默认高度 60 作为兜底
+
+            // 子 TMP 充满父节点，留一点内边距，便于换行测量
+            var crt = child.GetComponent<RectTransform>();
+            crt.anchorMin = new Vector2(0f, 0f);
+            crt.anchorMax = new Vector2(1f, 1f);
+            crt.pivot = new Vector2(0.5f, 0.5f);
+            crt.offsetMin = new Vector2(8f, 6f);
+            crt.offsetMax = new Vector2(-8f, -6f);
+            //============================================================
+            // 构造不定长文本数据（演示用，可替换为真实业务数据）
+            _texts.Clear();
+            var sbLine = new StringBuilder(256);
+            for (int i = 0; i < 10000; i++)
+            {
+                sbLine.Clear();
+                // 生成 1~8 行等效长度的随机中文文本（示意），用于测试换行
+                int lineCount = 1 + (i % 8);
+                for (int l = 0; l < lineCount; l++)
+                {
+                    sbLine.Append($"索引 {i} 的演示文本，第 {l + 1} 行，用于测试不定长换行显示。");
+                    if (l < lineCount - 1) sbLine.Append('\n');
+                }
+                _texts.Add(sbLine.ToString());
+            }
+
+            // 创建一个隐藏的测量用 TMP（复制字体/字号/行距配置），用于计算首选尺寸
+            var measureGO = new GameObject("TMP_Measure");
+            measureGO.hideFlags = HideFlags.HideAndDontSave;
+            var measureTMP = measureGO.AddComponent<TextMeshProUGUI>();
+            // 复制与预制体相同的基础设置（根据需要扩展）
+            var prefabTMP = child.GetComponentInChildren<TextMeshProUGUI>();
+            measureTMP.font = prefabTMP.font;
+            measureTMP.fontSize = prefabTMP.fontSize;
+            measureTMP.enableWordWrapping = true; // 关键：启用自动换行
+            measureTMP.richText = prefabTMP.richText;
+            measureTMP.alignment = prefabTMP.alignment;
+            measureTMP.lineSpacing = prefabTMP.lineSpacing;
+            measureTMP.gameObject.SetActive(false);
+
+            // 自定义文本 Binder：展示不定长文本
+            var binder = new TextBinder(_texts);
+
+            // 尺寸提供者：基于 TMP 首选尺寸计算（纵向=高度，横向=宽度）
+            var sizeProvider = new TextSizeProvider(_texts, measureTMP);
+
+            // 变尺寸适配器（注意传入 sizeProvider）
+            var adapter = new StandardVariableSizeAdapter(rt, () => _texts.Count, binder, sizeProvider);
+            // 显式使用纵向单列布局，避免自动桥接失败
+            var layout = new VerticalLayout(spacingY: 6f, paddingLeft: 6f, paddingTop: 6f, paddingRight: 6f, paddingBottom: 6f,
+                controlChildWidth: true, controlChildHeight: false, reverse: false);
+            scrollView.Initialize(adapter, layout);
+
 
             /*var scene = GKMgr.Instance.GetObject<SceneKit>();
             scene.OnLoadSceneProgress += (s, f) =>
@@ -278,4 +352,5 @@ namespace SimpleToolkits
             }
         }
     }
+
 }

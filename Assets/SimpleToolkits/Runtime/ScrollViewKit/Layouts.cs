@@ -11,7 +11,7 @@ namespace SimpleToolkits
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]
-        public RectOffset padding = new RectOffset(0, 0, 0, 0);
+        public RectOffset padding;
         
         [Tooltip("是否控制子对象的宽度")]
         public bool controlChildWidth = true;
@@ -25,6 +25,15 @@ namespace SimpleToolkits
         [Header("纵向布局设置")]
         [Tooltip("项目之间的垂直间距")]
         public float spacing = 4f;
+
+        private void Awake()
+        {
+            // 初始化RectOffset，避免在构造函数中调用
+            if (padding == null)
+            {
+                padding = new RectOffset(0, 0, 0, 0);
+            }
+        }
 
         #region IScrollLayout 接口实现
         public bool IsVertical => true;
@@ -113,7 +122,7 @@ namespace SimpleToolkits
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]
-        public RectOffset padding = new RectOffset(0, 0, 0, 0);
+        public RectOffset padding;
         
         [Tooltip("是否控制子对象的宽度")]
         public bool controlChildWidth = false;
@@ -127,6 +136,15 @@ namespace SimpleToolkits
         [Header("横向布局设置")]
         [Tooltip("项目之间的水平间距")]
         public float spacing = 4f;
+
+        private void Awake()
+        {
+            // 初始化RectOffset，避免在构造函数中调用
+            if (padding == null)
+            {
+                padding = new RectOffset(0, 0, 0, 0);
+            }
+        }
 
         #region IScrollLayout 接口实现
         public bool IsVertical => false;
@@ -207,7 +225,7 @@ namespace SimpleToolkits
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]
-        public RectOffset padding = new RectOffset(0, 0, 0, 0);
+        public RectOffset padding;
         
         [Tooltip("是否控制子对象的宽度")]
         public bool controlChildWidth = false;
@@ -231,6 +249,15 @@ namespace SimpleToolkits
 
         [Tooltip("垂直间距")]
         public float spacingY = 4f;
+
+        private void Awake()
+        {
+            // 初始化RectOffset，避免在构造函数中调用
+            if (padding == null)
+            {
+                padding = new RectOffset(0, 0, 0, 0);
+            }
+        }
 
         #region IScrollLayout 接口实现
         public bool IsVertical => isVertical;

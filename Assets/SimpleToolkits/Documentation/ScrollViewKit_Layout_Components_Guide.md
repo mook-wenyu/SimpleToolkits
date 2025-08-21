@@ -37,11 +37,11 @@ public class GridLayout : MonoBehaviour, IScrollLayout
 ### 在Unity Inspector中添加组件
 1. 选择GameObject（通常是ScrollView的Content对象）
 2. 点击"Add Component"按钮
-3. 导航到"SimpleToolkits/Scroll View/"分类
+3. 导航到"Layout/"分类
 4. 选择需要的布局组件：
    - **Vertical Layout**: 纵向滚动布局
-   - **Horizontal Layout**: 横向滚动布局
-   - **Grid Layout**: 网格滚动布局
+   - **Scroll Horizontal Layout**: 横向滚动布局
+   - **Scroll Grid Layout**: 网格滚动布局
 
 ### 通过代码添加组件
 ```csharp
@@ -51,12 +51,12 @@ verticalLayout.spacing = 4f;
 verticalLayout.padding = new RectOffset(16, 16, 16, 16);
 
 // 横向布局
-var horizontalLayout = content.gameObject.AddComponent<HorizontalLayout>();
+var horizontalLayout = content.gameObject.AddComponent<ScrollHorizontalLayout>();
 horizontalLayout.spacing = 4f;
 horizontalLayout.padding = new RectOffset(16, 16, 16, 16);
 
 // 网格布局
-var gridLayout = content.gameObject.AddComponent<GridLayout>();
+var gridLayout = content.gameObject.AddComponent<ScrollGridLayout>();
 gridLayout.spacingX = 4f;
 gridLayout.spacingY = 4f;
 gridLayout.constraintCount = 2;
@@ -68,14 +68,16 @@ gridLayout.isVertical = true;
 ### SimpleToolkits布局组件
 - **用途**: 专门用于ScrollView的虚拟化滚动
 - **命名空间**: `SimpleToolkits`
-- **位置**: SimpleToolkits/Scroll View/
+- **位置**: Layout/
 - **特点**: 支持虚拟化、高性能、动态尺寸计算
+- **组件名**: VerticalLayout, ScrollHorizontalLayout, ScrollGridLayout
 
 ### Unity UI布局组件
 - **用途**: 用于普通UI布局
 - **命名空间**: `UnityEngine.UI`
 - **位置**: Layout/
 - **特点**: 用于静态UI布局，不支持虚拟化滚动
+- **组件名**: VerticalLayoutGroup, HorizontalLayoutGroup, GridLayoutGroup
 
 ## 常见问题
 

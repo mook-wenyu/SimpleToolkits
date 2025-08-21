@@ -119,7 +119,7 @@ namespace SimpleToolkits.ScrollViewExample
                 // 检查是否已有布局组件，如果没有则报错并返回
                 if (!content.gameObject.TryGetComponent<IScrollLayout>(out var layout))
                 {
-                    Debug.LogError("无法找到 IScrollLayout 组件！请在 Content 对象上手动添加布局组件（如 VerticalLayout、HorizontalLayout 或 GridLayout）。", this);
+                    Debug.LogError("无法找到 IScrollLayout 组件！请在 Content 对象上手动添加布局组件（如 VerticalLayout、ScrollHorizontalLayout 或 ScrollGridLayout）。", this);
                     return;
                 }
             }

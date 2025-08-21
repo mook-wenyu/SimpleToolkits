@@ -6,7 +6,7 @@ namespace SimpleToolkits
     /// 纵向列表布局：从上到下，x 方向填充为 0。
     /// 用于ScrollView的纵向滚动布局。
     /// </summary>
-    [AddComponentMenu("SimpleToolkits/Scroll View/Vertical Layout")]
+    [AddComponentMenu("Layout/Vertical Layout")]
     public class VerticalLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
@@ -117,8 +117,8 @@ namespace SimpleToolkits
     /// 横向列表布局：从左到右，y 方向填充为 0。
     /// 用于ScrollView的横向滚动布局。
     /// </summary>
-    [AddComponentMenu("SimpleToolkits/Scroll View/Horizontal Layout")]
-    public class HorizontalLayout : MonoBehaviour, IScrollLayout
+    [AddComponentMenu("Layout/Scroll Horizontal Layout")]
+    public class ScrollHorizontalLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]
@@ -220,8 +220,8 @@ namespace SimpleToolkits
     /// 网格布局：按 ConstraintCount 进行换行/换列。IsVertical=true 表示纵向滚动（从上到下换行），false 表示横向滚动（从左到右换列）。
     /// 用于ScrollView的网格滚动布局。
     /// </summary>
-    [AddComponentMenu("SimpleToolkits/Scroll View/Grid Layout")]
-    public class GridLayout : MonoBehaviour, IScrollLayout
+    [AddComponentMenu("Layout/Scroll Grid Layout")]
+    public class ScrollGridLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]

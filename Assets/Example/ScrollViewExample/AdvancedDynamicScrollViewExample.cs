@@ -150,13 +150,20 @@ namespace SimpleToolkits.ScrollViewExample
             var content = _scrollView.GetComponentInChildren<ScrollRect>()?.content;
             if (content != null)
             {
-                var layout = content.gameObject.AddComponent<VerticalLayout>();
-                // 在 Inspector 中配置布局参数
-                layout.spacing = 4f;
-                layout.padding = new RectOffset(16, 16, 16, 16);
-                layout.controlChildWidth = true;
-                layout.controlChildHeight = false;
-                layout.reverse = false;
+                // 检查是否已有布局组件，如果没有则创建
+                if (!content.gameObject.TryGetComponent<IScrollLayout>(out var layout))
+                {
+                    layout = content.gameObject.AddComponent<VerticalLayout>();
+                    var verticalLayout = layout as VerticalLayout;
+                    if (verticalLayout != null)
+                    {
+                        verticalLayout.spacing = 4f;
+                        verticalLayout.padding = new RectOffset(16, 16, 16, 16);
+                        verticalLayout.controlChildWidth = true;
+                        verticalLayout.controlChildHeight = false;
+                        verticalLayout.reverse = false;
+                    }
+                }
             }
             else
             {

@@ -1,408 +1,598 @@
 namespace SimpleToolkits
 {
+    using System;
+    using System.Collections.Generic;
     using UnityEngine;
     using UnityEngine.UI;
-    using System;
-    using Cysharp.Threading.Tasks;
 
     /// <summary>
-    /// 高性能可无限滚动的 ScrollView 外观组件
-    /// - 支持纵向/横向/网格布局（通过 IScrollLayout 策略）
-    /// - 复用单元格，按需创建，超出视区自动回收
-    /// - 兼容 LayoutElement/ContentSizeFitter（单元格内部自行决定布局）
-    /// - 建议固定主轴尺寸以获得最佳性能，可选尺寸提供器支持变高/变宽
-    /// - 协程基于 UniTask
-    ///
-    /// 用法：
-    /// 1) 将本组件挂到包含 ScrollRect 的同级 GameObject
-    /// 2) 在 Content 上添加布局组件（VerticalLayout、HorizontalLayout 或 GridLayout）
-    /// 3) 调用 Initialize(adapter) 初始化
-    /// 4) 调用 Refresh() 或 SetItemCount() 刷新数据
+    /// 高性能ScrollView v4.0 - 完全自定义布局系统
+    /// 
+    /// 核心特性：
+    /// - 零Unity布局依赖：完全自实现布局计算
+    /// - 高性能：优化的虚拟化滚动和对象池
+    /// - 易用性：极简API设计，链式调用
+    /// - 扩展性：可插拔的布局、尺寸提供器、适配器
+    /// - 稳定性：完善的生命周期管理和资源清理
     /// </summary>
     [RequireComponent(typeof(ScrollRect))]
-    public sealed class ScrollView : MonoBehaviour
+    public class ScrollView : MonoBehaviour
     {
-        [Header("必需组件")]
-        [SerializeField] private ScrollRect _scrollRect; // 允许在 Inspector 直接绑定，减少运行时查找
-
-        [Header("可选：内容容器，留空则使用 ScrollRect.content")]
-        [SerializeField] private RectTransform _content; // 允许在 Inspector 直接绑定
-
-        // 适配器与布局策略
+        #region 核心组件
+        private ScrollRect _scrollRect;
+        private RectTransform _content;
+        private ScrollController _controller;
         private IScrollAdapter _adapter;
         private IScrollLayout _layout;
+        private IScrollSizeProvider _sizeProvider;
+        #endregion
 
-        // 控制器（内部负责复用/定位/计算）
-        private Internal.ScrollController _controller;
+        #region 状态
+        private bool _initialized = false;
+        #endregion
 
-        // 初始化状态
-        private bool _initialized;
+        #region 公共属性
+        /// <summary>是否已初始化</summary>
+        public bool IsInitialized => _initialized && _controller != null && !_controller.IsDisposed;
 
-        /// <summary>
-        /// 是否已初始化。
-        /// </summary>
-        public bool Initialized => _initialized;
+        /// <summary>当前数据项数量</summary>
+        public int Count => _adapter?.Count ?? 0;
 
-        // 当前可见范围缓存（闭区间），当无可见项时为 -1,-1
-        private int _visibleFirst = -1;
-        private int _visibleLast = -1;
+        /// <summary>当前可见的第一个索引</summary>
+        public int VisibleFirst => _controller?.VisibleFirst ?? -1;
 
-        /// <summary>
-        /// 可见范围变化事件（first,last 为闭区间）。
-        /// </summary>
+        /// <summary>当前可见的最后一个索引</summary>
+        public int VisibleLast => _controller?.VisibleLast ?? -1;
+        #endregion
+
+        #region 事件
+        /// <summary>可见范围变化事件</summary>
         public event Action<int, int> OnVisibleRangeChanged;
 
-        /// <summary>
-        /// 初始化滚动视图。必须在使用前调用一次。
-        /// </summary>
-        public void Initialize(IScrollAdapter adapter)
+        /// <summary>滚动位置变化事件</summary>
+        public event Action<Vector2> OnScrollPositionChanged;
+        #endregion
+
+        #region 组件自动发现和通知监听
+        private bool _componentNotificationListenerEnabled = false;
+        
+        /// <summary>启用组件自动发现和通知监听</summary>
+        public void EnableAutoComponentDetection()
         {
-            // 参数检查
-            if (_scrollRect == null)
+            if (_componentNotificationListenerEnabled) return;
+            
+            _componentNotificationListenerEnabled = true;
+            ScrollComponentNotifier.LayoutChanged += OnLayoutComponentChanged;
+            ScrollComponentNotifier.SizeProviderChanged += OnSizeProviderComponentChanged;
+            
+            // 立即检测并使用可用的组件
+            TryDetectAndUseComponents();
+        }
+        
+        /// <summary>禁用组件自动发现和通知监听</summary>
+        public void DisableAutoComponentDetection()
+        {
+            if (!_componentNotificationListenerEnabled) return;
+            
+            _componentNotificationListenerEnabled = false;
+            ScrollComponentNotifier.LayoutChanged -= OnLayoutComponentChanged;
+            ScrollComponentNotifier.SizeProviderChanged -= OnSizeProviderComponentChanged;
+        }
+        
+        /// <summary>检测并使用可用的组件</summary>
+        private void TryDetectAndUseComponents()
+        {
+            // 在Content上查找布局组件
+            var detectedLayout = GetComponent<IScrollLayout>() ?? 
+                                _content?.GetComponent<IScrollLayout>() ??
+                                GetComponentInChildren<IScrollLayout>();
+            
+            if (detectedLayout != null && detectedLayout != _layout)
             {
-                _scrollRect = GetComponentInChildren<ScrollRect>(true);
+                SetLayout(detectedLayout);
             }
-
-            if (_scrollRect == null)
+            
+            // 在本 GameObject和子对象中查找尺寸提供器
+            var detectedSizeProvider = GetComponent<IScrollSizeProvider>() ??
+                                      GetComponentInChildren<IScrollSizeProvider>();
+            
+            if (detectedSizeProvider != null && detectedSizeProvider != _sizeProvider)
             {
-                Debug.LogError("[ScrollView] 缺少 ScrollRect 组件");
-                return;
+                SetSizeProvider(detectedSizeProvider);
             }
-
-            _content = _content != null ? _content : _scrollRect.content;
-            if (_content == null)
+        }
+        
+        /// <summary>布局组件变化时的处理</summary>
+        private void OnLayoutComponentChanged(IScrollLayout changedLayout)
+        {
+            if (!_componentNotificationListenerEnabled || !IsInitialized) return;
+            
+            // 检查这个变化的布局是否是我们正在使用的
+            if (changedLayout == _layout)
             {
-                Debug.LogError("[ScrollView] 缺少 Content 容器(RectTransform)");
-                return;
+                Refresh();
             }
+        }
+        
+        /// <summary>尺寸提供器组件变化时的处理</summary>
+        private void OnSizeProviderComponentChanged(IScrollSizeProvider changedSizeProvider)
+        {
+            if (!_componentNotificationListenerEnabled || !IsInitialized) return;
+            
+            // 检查这个变化的尺寸提供器是否是我们正在使用的
+            if (changedSizeProvider == _sizeProvider)
+            {
+                Refresh();
+            }
+        }
+        #endregion
 
+        #region 工厂方法
+        /// <summary>创建ScrollView构建器</summary>
+        public static ScrollViewBuilder Create(ScrollRect scrollRect)
+        {
+            return new ScrollViewBuilder(scrollRect);
+        }
+
+        /// <summary>创建ScrollView构建器 - 自动查找ScrollRect</summary>
+        public static ScrollViewBuilder Create(GameObject gameObject)
+        {
+            var scrollRect = gameObject.GetComponent<ScrollRect>();
+            if (scrollRect == null)
+                scrollRect = gameObject.GetComponentInChildren<ScrollRect>();
+            
+            if (scrollRect == null)
+                throw new Exception("ScrollRect not found!");
+            
+            return new ScrollViewBuilder(scrollRect);
+        }
+        #endregion
+
+        #region 核心API
+        /// <summary>初始化ScrollView（内部使用）</summary>
+        internal void Initialize(IScrollAdapter adapter, IScrollLayout layout, IScrollSizeProvider sizeProvider, int poolSize)
+        {
+            if (_initialized) return;
+
+            _scrollRect = GetComponent<ScrollRect>();
+            _content = _scrollRect.content;
             _adapter = adapter;
-            _layout = _content.GetComponent<IScrollLayout>();
-            if (_layout == null)
+            
+            // 设置管理关系
+            if (layout is ScrollLayoutBehaviour layoutBehaviour)
             {
-                Debug.LogError("[ScrollView] Content 上未找到 IScrollLayout 组件，请添加 VerticalLayout、HorizontalLayout 或 GridLayout 组件");
-                return;
+                layoutBehaviour.SetManagedBy(this);
             }
-
-            // 如果 Content 上仍有启用的 Unity LayoutGroup，则禁用以避免与手动定位冲突
-            var hasAnyLayoutGroup = _content.GetComponent<HorizontalLayoutGroup>() != null
-                                    || _content.GetComponent<VerticalLayoutGroup>() != null
-                                    || _content.GetComponent<GridLayoutGroup>() != null;
-            if (hasAnyLayoutGroup)
+            _layout = layout;
+            
+            if (sizeProvider is ScrollSizeProviderBehaviour sizeProviderBehaviour)
             {
-                Debug.LogWarning("[ScrollView] 检测到 Content 上存在 Unity LayoutGroup，虚拟化运行期将禁用这些组件以避免冲突。");
-                var v = _content.GetComponent<VerticalLayoutGroup>();
-                if (v != null) v.enabled = false;
-                var h = _content.GetComponent<HorizontalLayoutGroup>();
-                if (h != null) h.enabled = false;
-                var g = _content.GetComponent<GridLayoutGroup>();
-                if (g != null) g.enabled = false;
+                sizeProviderBehaviour.SetManagedBy(this);
             }
+            _sizeProvider = sizeProvider;
 
-            // ScrollRect 方向设置
-            _scrollRect.horizontal = !_layout.IsVertical;
-            _scrollRect.vertical = _layout.IsVertical;
-            _scrollRect.movementType = ScrollRect.MovementType.Clamped;
-
-            // 创建控制器并桥接可见范围变化事件
-            _controller = new Internal.ScrollController(
-                _scrollRect,
-                _content,
-                _adapter,
-                _layout,
-                (first, last) =>
-                {
-                    _visibleFirst = first;
-                    _visibleLast = last;
-                    OnVisibleRangeChanged?.Invoke(first, last);
-                });
-
-            // 监听滚动与尺寸变化
-            _scrollRect.onValueChanged.AddListener(OnScrollValueChanged);
+            // 创建控制器
+            _controller = new ScrollController(_scrollRect, _content, _layout, _sizeProvider, _adapter, poolSize);
+            
+            // 绑定事件
+            _controller.OnVisibleRangeChanged += (first, last) => OnVisibleRangeChanged?.Invoke(first, last);
+            _controller.OnScrollPositionChanged += pos => OnScrollPositionChanged?.Invoke(pos);
 
             _initialized = true;
-
-            // 初次布局
-            Refresh(true);
         }
 
-
-        //================ 便捷初始化方法 ================
-        /// <summary>
-        /// 便捷初始化（固定数量）。
-        /// </summary>
-        public void Initialize(RectTransform prefab, int count, Action<int, RectTransform> bind)
+        /// <summary>刷新数据</summary>
+        public void Refresh()
         {
-            if (prefab == null || bind == null)
+            if (!IsInitialized) return;
+            _controller.Refresh();
+        }
+
+        /// <summary>获取当前使用的布局</summary>
+        public IScrollLayout GetCurrentLayout()
+        {
+            return _layout;
+        }
+
+        /// <summary>获取当前使用的尺寸提供器</summary>
+        public IScrollSizeProvider GetCurrentSizeProvider()
+        {
+            return _sizeProvider;
+        }
+
+        /// <summary>设置布局（组件独立工作时使用）</summary>
+        public void SetLayout(IScrollLayout layout)
+        {
+            if (layout == null) return;
+            
+            // 取消旧布局管理
+            if (_layout is ScrollLayoutBehaviour oldLayoutBehaviour)
             {
-                Debug.LogError("[ScrollView] Initialize 参数无效");
-                return;
+                oldLayoutBehaviour.SetUnmanaged();
             }
-            Initialize(new SimpleAdapter(prefab, () => count, bind));
-        }
-
-        /// <summary>
-        /// 便捷初始化（动态数量委托）。
-        /// </summary>
-        public void Initialize(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind)
-        {
-            if (prefab == null || countGetter == null || bind == null)
+            
+            _layout = layout;
+            
+            // 设置新布局管理
+            if (_layout is ScrollLayoutBehaviour newLayoutBehaviour)
             {
-                Debug.LogError("[ScrollView] Initialize 参数无效");
-                return;
+                newLayoutBehaviour.SetManagedBy(this);
             }
-            Initialize(new SimpleAdapter(prefab, countGetter, bind));
-        }
-
-
-
-        /// <summary>
-        /// 便捷初始化（变尺寸：固定数量）。仅在单列/单行布局有效。
-        /// </summary>
-        public void InitializeVariable(RectTransform prefab, int count, Action<int, RectTransform> bind,
-            Func<int, Vector2, IScrollLayout, Vector2> sizeGetter, Vector2 fallbackSize = default)
-        {
-            if (prefab == null || bind == null || sizeGetter == null)
+            
+            if (IsInitialized)
             {
-                Debug.LogError("[ScrollView] InitializeVariable 参数无效");
-                return;
-            }
-            Initialize(new SimpleVarAdapter(prefab, () => count, bind, sizeGetter, fallbackSize));
-        }
-
-        /// <summary>
-        /// 便捷初始化（变尺寸：动态数量）。仅在单列/单行布局有效。
-        /// </summary>
-        public void InitializeVariable(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind,
-            Func<int, Vector2, IScrollLayout, Vector2> sizeGetter, Vector2 fallbackSize = default)
-        {
-            if (prefab == null || countGetter == null || bind == null || sizeGetter == null)
-            {
-                Debug.LogError("[ScrollView] InitializeVariable 参数无效");
-                return;
-            }
-            Initialize(new SimpleVarAdapter(prefab, countGetter, bind, sizeGetter, fallbackSize));
-        }
-
-        /// <summary>
-        /// 获取当前可见范围（闭区间）。当无可见项时返回 (-1,-1)。
-        /// </summary>
-        public (int first, int last) GetVisibleRange() => (_visibleFirst, _visibleLast);
-
-        /// <summary>
-        /// 当前可见项数量（无可见项时为 0）。
-        /// </summary>
-        public int VisibleCount => (_visibleFirst >= 0 && _visibleLast >= _visibleFirst) ? (_visibleLast - _visibleFirst + 1) : 0;
-
-        /// <summary>
-        /// 设置数据总量（通过适配器返回的 Count 优先）。
-        /// </summary>
-        public void SetItemCount(int count, bool keepPosition = false)
-        {
-            if (!_initialized) return;
-            _adapter.OverrideCount(count);
-            Refresh(!keepPosition);
-        }
-
-        /// <summary>
-        /// 强制刷新：重新计算内容尺寸并重建可视单元格。
-        /// </summary>
-        public void Refresh(bool resetPosition = false)
-        {
-            if (!_initialized) return;
-            _controller.Rebuild(resetPosition);
-        }
-
-        /// <summary>
-        /// 失效所有项尺寸并重建（用于变尺寸模式下，运行期项尺寸发生变化）。
-        /// </summary>
-        /// <param name="keepPosition">是否保留当前滚动位置</param>
-        public void InvalidateAllSizes(bool keepPosition = true)
-        {
-            if (!_initialized) return;
-            _controller.Rebuild(!keepPosition);
-        }
-
-        /// <summary>
-        /// 滚动到指定索引。
-        /// </summary>
-        /// <param name="index">目标索引</param>
-        /// <param name="align01">0=开始对齐，0.5=居中，1=末端对齐</param>
-        /// <param name="animated">是否平滑滚动</param>
-        /// <param name="duration">动画时长（秒）</param>
-        public async UniTask ScrollTo(int index, float align01 = 0f, bool animated = true, float duration = 0.25f)
-        {
-            if (!_initialized) return;
-            var target = _controller.CalculateScrollPositionFor(index, align01);
-
-            if (!animated || duration <= 0f)
-            {
-                _controller.SetNormalizedPosition(target);
-                _controller.ForceUpdate();
-                return;
-            }
-
-            // 简单插值动画（基于 UniTask）
-            float t = 0f;
-            var start = _controller.GetNormalizedPosition();
-            while (t < 1f)
-            {
-                t += Mathf.Clamp01(Time.unscaledDeltaTime / duration);
-                var v = Mathf.SmoothStep(0f, 1f, t);
-                var cur = Mathf.Lerp(start, target, v);
-                _controller.SetNormalizedPosition(cur);
-                await UniTask.Yield();
-            }
-
-            _controller.SetNormalizedPosition(target);
-            _controller.ForceUpdate();
-        }
-
-        /// <summary>
-        /// 在外部布局或屏幕尺寸变化时调用，以触发重新布局。
-        /// </summary>
-        public void NotifyViewportOrLayoutChanged(bool keepPosition = true)
-        {
-            if (!_initialized) return;
-            _controller.Rebuild(!keepPosition);
-        }
-
-
-        /// <summary>
-        /// 滚动到起始位置（顶部/最左）。
-        /// </summary>
-        public void ScrollToTop()
-        {
-            if (!_initialized) return;
-            _controller.SetNormalizedPosition(_layout.IsVertical ? 1f : 0f);
-            _controller.ForceUpdate();
-        }
-
-        /// <summary>
-        /// 滚动到末尾位置（底部/最右）。
-        /// </summary>
-        public void ScrollToBottom()
-        {
-            if (!_initialized) return;
-            _controller.SetNormalizedPosition(_layout.IsVertical ? 0f : 1f);
-            _controller.ForceUpdate();
-        }
-
-        /// <summary>
-        /// 尝试获取某索引对应的激活中 Cell（仅当其在可见范围内）。
-        /// </summary>
-        public bool TryGetActiveCell(int index, out RectTransform cell)
-        {
-            cell = null;
-            if (!_initialized) return false;
-            return _controller.TryGetActiveCell(index, out cell);
-        }
-
-        /// <summary>
-        /// 重新绑定某个索引（当业务数据变更且该项可见时）。
-        /// </summary>
-        public void RebindItem(int index)
-        {
-            if (!_initialized) return;
-            _controller.RebindIndex(index);
-        }
-
-        /// <summary>
-        /// 遍历当前可见的所有项。
-        /// </summary>
-        public void ForEachVisible(Action<int, RectTransform> action)
-        {
-            if (!_initialized) return;
-            _controller.ForEachVisible(action);
-        }
-
-        private void OnScrollValueChanged(Vector2 _)
-        {
-            if (!_initialized) return;
-            _controller.OnScroll();
-        }
-
-        private void OnEnable()
-        {
-            if (_initialized) _controller.ForceUpdate();
-        }
-
-        private void OnDisable()
-        {
-            // 暂不做特殊处理，保留位置与池
-        }
-
-        private void OnRectTransformDimensionsChange()
-        {
-            // 当视口或父级尺寸变化时，自动触发重建以适配（保持当前位置）
-            if (_initialized && gameObject.activeInHierarchy)
-            {
-                _controller.Rebuild(resetPosition: false);
+                // 重新创建控制器以使用新布局
+                RecreateController();
             }
         }
 
+        /// <summary>设置尺寸提供器（组件独立工作时使用）</summary>
+        public void SetSizeProvider(IScrollSizeProvider sizeProvider)
+        {
+            if (sizeProvider == null) return;
+            
+            // 取消旧尺寸提供器管理
+            if (_sizeProvider is ScrollSizeProviderBehaviour oldSizeProviderBehaviour)
+            {
+                oldSizeProviderBehaviour.SetUnmanaged();
+            }
+            
+            _sizeProvider = sizeProvider;
+            
+            // 设置新尺寸提供器管理
+            if (_sizeProvider is ScrollSizeProviderBehaviour newSizeProviderBehaviour)
+            {
+                newSizeProviderBehaviour.SetManagedBy(this);
+            }
+            
+            if (IsInitialized)
+            {
+                // 重新创建控制器以使用新尺寸提供器
+                RecreateController();
+            }
+        }
+
+        /// <summary>尝试自动初始化（当组件独立添加时使用）</summary>
+        public void TryAutoInitialize()
+        {
+            if (_initialized) return;
+
+            // 启用组件自动发现
+            EnableAutoComponentDetection();
+
+            // 检查是否有足够的组件来初始化
+            if (_layout == null)
+            {
+                _layout = GetComponent<IScrollLayout>() ?? GetComponentInChildren<IScrollLayout>();
+            }
+
+            if (_sizeProvider == null)
+            {
+                _sizeProvider = GetComponent<IScrollSizeProvider>() ?? GetComponentInChildren<IScrollSizeProvider>();
+            }
+
+            // 如果有适配器和基本组件，尝试初始化
+            if (_adapter != null && _layout != null && _sizeProvider != null)
+            {
+                Initialize(_adapter, _layout, _sizeProvider, 20); // 使用默认池大小
+            }
+        }
+
+        /// <summary>重新创建控制器</summary>
+        private void RecreateController()
+        {
+            if (!_initialized || _adapter == null || _layout == null || _sizeProvider == null) return;
+
+            // 保存当前滚动位置
+            var currentPosition = _scrollRect.normalizedPosition;
+
+            // 销毁旧控制器
+            _controller?.Dispose();
+
+            // 创建新控制器
+            _controller = new ScrollController(_scrollRect, _content, _layout, _sizeProvider, _adapter, 20);
+            
+            // 绑定事件
+            _controller.OnVisibleRangeChanged += (first, last) => OnVisibleRangeChanged?.Invoke(first, last);
+            _controller.OnScrollPositionChanged += pos => OnScrollPositionChanged?.Invoke(pos);
+
+            // 恢复滚动位置
+            _scrollRect.normalizedPosition = currentPosition;
+        }
+
+        /// <summary>滚动到指定索引</summary>
+        public void ScrollToIndex(int index, bool immediate = false)
+        {
+            if (!IsInitialized) return;
+            _controller.ScrollToIndex(index, immediate);
+        }
+
+        /// <summary>滚动到顶部</summary>
+        public void ScrollToTop(bool immediate = false)
+        {
+            if (!IsInitialized) return;
+            _controller.ScrollToTop(immediate);
+        }
+
+        /// <summary>滚动到底部</summary>
+        public void ScrollToBottom(bool immediate = false)
+        {
+            if (!IsInitialized) return;
+            _controller.ScrollToBottom(immediate);
+        }
+        #endregion
+
+        #region Unity生命周期
+        private void Awake()
+        {
+            // 自动启用组件发现机制
+            EnableAutoComponentDetection();
+        }
+        
         private void OnDestroy()
         {
-            if (_controller != null)
+            // 清理管理关系
+            if (_layout is ScrollLayoutBehaviour layoutBehaviour)
             {
-                _scrollRect.onValueChanged.RemoveListener(OnScrollValueChanged);
-                _controller.Dispose();
-                _controller = null;
+                layoutBehaviour.SetUnmanaged();
             }
-            _initialized = false;
+            if (_sizeProvider is ScrollSizeProviderBehaviour sizeProviderBehaviour)
+            {
+                sizeProviderBehaviour.SetUnmanaged();
+            }
+            
+            DisableAutoComponentDetection();
+            _controller?.Dispose();
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// 简单数据适配器实现
+    /// </summary>
+    public class SimpleScrollAdapter<T> : IScrollAdapter
+    {
+        private readonly IList<T> _data;
+        private readonly RectTransform _cellPrefab;
+        private readonly Action<int, RectTransform, T> _onBind;
+        private readonly Action<RectTransform> _onCellCreated;
+        private readonly Action<int, RectTransform> _onCellRecycled;
+
+        public int Count => _data?.Count ?? 0;
+
+        public SimpleScrollAdapter(
+            IList<T> data,
+            RectTransform cellPrefab,
+            Action<int, RectTransform, T> onBind,
+            Action<RectTransform> onCellCreated = null,
+            Action<int, RectTransform> onCellRecycled = null)
+        {
+            _data = data ?? throw new ArgumentNullException(nameof(data));
+            _cellPrefab = cellPrefab != null ? cellPrefab : throw new ArgumentNullException(nameof(cellPrefab));
+            _onBind = onBind ?? throw new ArgumentNullException(nameof(onBind));
+            _onCellCreated = onCellCreated;
+            _onCellRecycled = onCellRecycled;
         }
 
-        //================ 内部适配器类 ================
-        /// <summary>
-        /// 简单适配器：统一尺寸。
-        /// </summary>
-        private sealed class SimpleAdapter : IScrollAdapter
+        public RectTransform GetCellPrefab() => _cellPrefab;
+
+        public void BindCell(int index, RectTransform cell)
         {
-            private readonly RectTransform _prefab;
-            private readonly Func<int> _countGetter;
-            private readonly Action<int, RectTransform> _bind;
-            private int _override = -1;
-
-            public SimpleAdapter(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind)
+            if (index >= 0 && index < Count)
             {
-                _prefab = prefab;
-                _countGetter = countGetter;
-                _bind = bind;
+                _onBind(index, cell, _data[index]);
             }
-
-            public int Count => _override >= 0 ? _override : (_countGetter != null ? _countGetter() : 0);
-            public void OverrideCount(int count) => _override = count;
-            public RectTransform GetCellPrefab() => _prefab;
-            public void BindCell(int index, RectTransform cell) => _bind?.Invoke(index, cell);
         }
 
-        /// <summary>
-        /// 简单适配器：变尺寸。
-        /// </summary>
-        private sealed class SimpleVarAdapter : IScrollAdapter, IVariableSizeAdapter
+        public void OnCellCreated(RectTransform cell)
         {
-            private readonly SimpleAdapter _base;
-            private readonly Func<int, Vector2, IScrollLayout, Vector2> _sizeGetter;
-            private readonly Vector2 _fallback;
+            _onCellCreated?.Invoke(cell);
+        }
 
-            public SimpleVarAdapter(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind,
-                Func<int, Vector2, IScrollLayout, Vector2> sizeGetter, Vector2 fallback)
+        public void OnCellRecycled(int index, RectTransform cell)
+        {
+            _onCellRecycled?.Invoke(index, cell);
+        }
+    }
+
+    /// <summary>
+    /// ScrollView构建器 - 提供链式API
+    /// </summary>
+    public class ScrollViewBuilder
+    {
+        private readonly ScrollRect _scrollRect;
+        private IScrollAdapter _adapter;
+        private IScrollLayout _layout;
+        private IScrollSizeProvider _sizeProvider;
+        private int _poolSize = 20;
+
+        internal ScrollViewBuilder(ScrollRect scrollRect)
+        {
+            _scrollRect = scrollRect != null ? scrollRect : throw new ArgumentNullException(nameof(scrollRect));
+        }
+
+        /// <summary>设置数据和绑定</summary>
+        public ScrollViewBuilder SetData<T>(
+            IList<T> data,
+            RectTransform cellPrefab,
+            Action<int, RectTransform, T> onBind,
+            Action<RectTransform> onCellCreated = null,
+            Action<int, RectTransform> onCellRecycled = null)
+        {
+            _adapter = new SimpleScrollAdapter<T>(data, cellPrefab, onBind, onCellCreated, onCellRecycled);
+            return this;
+        }
+
+        /// <summary>设置自定义适配器</summary>
+        public ScrollViewBuilder SetAdapter(IScrollAdapter adapter)
+        {
+            _adapter = adapter;
+            return this;
+        }
+
+        /// <summary>设置纵向布局</summary>
+        public ScrollViewBuilder SetVerticalLayout(float spacing = 0f, RectOffset padding = null)
+        {
+            var layout = _scrollRect.gameObject.AddComponent<VerticalScrollLayout>();
+            layout.Spacing = spacing;
+            layout.Padding = padding ?? new RectOffset();
+            _layout = layout;
+            return this;
+        }
+
+        /// <summary>设置横向布局</summary>
+        public ScrollViewBuilder SetHorizontalLayout(float spacing = 0f, RectOffset padding = null)
+        {
+            var layout = _scrollRect.gameObject.AddComponent<HorizontalScrollLayout>();
+            layout.Spacing = spacing;
+            layout.Padding = padding ?? new RectOffset();
+            _layout = layout;
+            return this;
+        }
+
+        /// <summary>设置网格布局</summary>
+        public ScrollViewBuilder SetGridLayout(Vector2 cellSize, int constraintCount, float spacing = 0f, RectOffset padding = null, GridAxis axis = GridAxis.Vertical)
+        {
+            var layout = _scrollRect.gameObject.AddComponent<GridScrollLayout>();
+            layout.CellSize = cellSize;
+            layout.ConstraintCount = constraintCount;
+            layout.Spacing = spacing;
+            layout.Padding = padding ?? new RectOffset();
+            layout.Axis = axis;
+            _layout = layout;
+            return this;
+        }
+
+        /// <summary>自动检测并使用可视化布局组件</summary>
+        public ScrollViewBuilder SetLayoutFromBehaviour()
+        {
+            var layoutBehaviour = _scrollRect.GetComponent<ScrollLayoutBehaviour>();
+            if (layoutBehaviour != null)
             {
-                _base = new SimpleAdapter(prefab, countGetter, bind);
-                _sizeGetter = sizeGetter;
-                _fallback = fallback;
+                _layout = layoutBehaviour;
+            }
+            return this;
+        }
+
+        /// <summary>设置自定义布局</summary>
+        public ScrollViewBuilder SetLayout(IScrollLayout layout)
+        {
+            _layout = layout;
+            return this;
+        }
+
+        /// <summary>设置固定尺寸</summary>
+        public ScrollViewBuilder SetFixedSize(Vector2 fixedSize)
+        {
+            var provider = _scrollRect.gameObject.AddComponent<FixedSizeProviderBehaviour>();
+            provider.FixedSize = fixedSize;
+            _sizeProvider = provider;
+            return this;
+        }
+
+        /// <summary>设置自适应宽度</summary>
+        public ScrollViewBuilder SetFitWidth(float fixedHeight, float widthPadding = 0f)
+        {
+            var provider = _scrollRect.gameObject.AddComponent<FitWidthSizeProviderBehaviour>();
+            provider.FixedHeight = fixedHeight;
+            provider.WidthPadding = widthPadding;
+            _sizeProvider = provider;
+            return this;
+        }
+
+        /// <summary>设置自适应高度</summary>
+        public ScrollViewBuilder SetFitHeight(float fixedWidth, float heightPadding = 0f)
+        {
+            var provider = _scrollRect.gameObject.AddComponent<FitHeightSizeProviderBehaviour>();
+            provider.FixedWidth = fixedWidth;
+            provider.HeightPadding = heightPadding;
+            _sizeProvider = provider;
+            return this;
+        }
+
+        /// <summary>设置动态尺寸</summary>
+        public ScrollViewBuilder SetDynamicSize(Func<int, Vector2, Vector2> sizeCalculator, Vector2 defaultSize, int maxCacheSize = 1000)
+        {
+            var provider = _scrollRect.gameObject.AddComponent<DynamicSizeProviderBehaviour>();
+            provider.DefaultSize = defaultSize;
+            provider.MaxCacheSize = maxCacheSize;
+            provider.SetSizeCalculator(sizeCalculator);
+            _sizeProvider = provider;
+            return this;
+        }
+
+        /// <summary>设置自定义尺寸提供器</summary>
+        public ScrollViewBuilder SetSizeProvider(IScrollSizeProvider sizeProvider)
+        {
+            _sizeProvider = sizeProvider;
+            return this;
+        }
+
+        /// <summary>自动检测并使用可视化尺寸提供器组件</summary>
+        public ScrollViewBuilder SetSizeProviderFromBehaviour()
+        {
+            var sizeProviderBehaviour = _scrollRect.GetComponent<ScrollSizeProviderBehaviour>();
+            if (sizeProviderBehaviour != null)
+            {
+                _sizeProvider = sizeProviderBehaviour;
+            }
+            return this;
+        }
+
+        /// <summary>设置对象池大小</summary>
+        public ScrollViewBuilder SetPoolSize(int poolSize)
+        {
+            _poolSize = poolSize;
+            return this;
+        }
+
+        /// <summary>构建ScrollView</summary>
+        public ScrollView Build()
+        {
+            if (_adapter == null) throw new ArgumentException("Adapter is required");
+
+            // 自动检测可视化组件
+            if (_layout == null)
+            {
+                var layoutBehaviour = _scrollRect.GetComponent<ScrollLayoutBehaviour>();
+                if (layoutBehaviour != null)
+                {
+                    _layout = layoutBehaviour;
+                }
+                else
+                {
+                    // 创建默认的纵向布局
+                    var defaultLayout = _scrollRect.gameObject.AddComponent<VerticalScrollLayout>();
+                    _layout = defaultLayout;
+                }
             }
 
-            public int Count => _base.Count;
-            public void OverrideCount(int count) => _base.OverrideCount(count);
-            public RectTransform GetCellPrefab() => _base.GetCellPrefab();
-            public void BindCell(int index, RectTransform cell) => _base.BindCell(index, cell);
-
-            public Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout)
+            if (_sizeProvider == null)
             {
-                if (_sizeGetter == null) return _fallback;
-                return _sizeGetter(index, viewportSize, layout);
+                var sizeProviderBehaviour = _scrollRect.GetComponent<ScrollSizeProviderBehaviour>();
+                if (sizeProviderBehaviour != null)
+                {
+                    _sizeProvider = sizeProviderBehaviour;
+                }
+                else
+                {
+                    // 创建默认的自适应宽度提供器
+                    var defaultProvider = _scrollRect.gameObject.AddComponent<FitWidthSizeProviderBehaviour>();
+                    defaultProvider.FixedHeight = 60f;
+                    defaultProvider.WidthPadding = 10f;
+                    _sizeProvider = defaultProvider;
+                }
             }
+
+            // 获取或添加ScrollView组件
+            var scrollView = _scrollRect.GetComponent<ScrollView>();
+            if (scrollView == null)
+                scrollView = _scrollRect.gameObject.AddComponent<ScrollView>();
+
+            // 初始化
+            scrollView.Initialize(_adapter, _layout, _sizeProvider, _poolSize);
+
+            return scrollView;
         }
     }
 }

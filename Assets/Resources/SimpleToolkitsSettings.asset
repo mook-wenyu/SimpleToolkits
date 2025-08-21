@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: SimpleToolkitsSettings
   m_EditorClassIdentifier: 
   gamePlayMode: 1
-  yooPackageInfos:
-  - packageName: DefaultPackage
-    hostServerURL: 
-    fallbackHostServerURL: 
-    isDefaultPackage: 1
+  yooPackageInfos: []
   supportedLanguages:
-  - key: cn
+  - langKey: cn
     language: 40
-  - key: en
+  - langKey: en
     language: 10
   languageExcelFileName: Languages
   csOutputPath: Assets/Scripts/Configs
   jsonOutputPath: Assets/GameRes/JsonConfigs
+  storageType: 0
+  enableEncryption: 0
+  encryptionKey: 
+  autoSaveInterval: 0

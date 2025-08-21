@@ -21,7 +21,11 @@
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(rm:*)",
       "Bash(grep:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(timeout:*)",
+      "mcp__UnityMCP__execute_menu_item",
+      "Bash(del *.cs)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": [],

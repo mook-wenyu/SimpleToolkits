@@ -6,18 +6,20 @@ using UnityEngine.UI;
 namespace SimpleToolkits
 {
     /// <summary>
-    /// BaseVariableSizeAdapter扩展方法
+    /// StandardVariableSizeAdapter扩展方法
     /// 提供更便捷的创建和配置方法
     /// </summary>
-    public static class BaseVariableSizeAdapterExtensions
+    public static class StandardVariableSizeAdapterExtensions
     {
         #region 快捷创建方法
         /// <summary>
-        /// 创建基于List数据的LayoutAutoSizeProvider
+        /// 创建基于List数据的StandardVariableSizeAdapter
         /// </summary>
-        public static LayoutAutoSizeProvider CreateForList<T>(
+        public static StandardVariableSizeAdapter CreateForList<T>(
             RectTransform template,
             List<T> dataList,
+            ICellBinder binder,
+            Action<RectTransform, object> templateBinder,
             float fixedWidth,
             float minHeight = 60f,
             float maxHeight = 300f,
@@ -27,37 +29,46 @@ namespace SimpleToolkits
         {
             if (template == null) throw new ArgumentNullException(nameof(template));
             if (dataList == null) throw new ArgumentNullException(nameof(dataList));
+            if (binder == null) throw new ArgumentNullException(nameof(binder));
 
             Func<int, object> dataGetter = index => 
                 index >= 0 && index < dataList.Count ? dataList[index] : null;
 
-            Func<int, object, Vector2> calculator = null;
+            Func<int, object, Vector2> sizeCalculator = null;
             if (customSizeCalculator != null)
             {
-                calculator = (index, data) => 
-                    data is T typedData ? customSizeCalculator(index, typedData) : Vector2.zero;
+                sizeCalculator = (index, data) => 
+                {
+                    if (data is T typedData)
+                        return customSizeCalculator.Invoke(index, typedData);
+                    return Vector2.zero;
+                };
             }
 
-            return new LayoutAutoSizeProvider(
-                template: template,
-                countGetter: () => dataList.Count,
-                dataGetter: dataGetter,
-                templateBinder: null,
-                fixedWidth: fixedWidth,
-                minHeight: minHeight,
-                maxHeight: maxHeight,
-                useLayoutGroups: useLayoutGroups,
-                enableCache: enableCache,
-                customSizeCalculator: calculator
+            return new StandardVariableSizeAdapter(
+                template,
+                () => dataList.Count,
+                dataGetter,
+                binder,
+                templateBinder,
+                fixedWidth,
+                minHeight,
+                maxHeight,
+                useLayoutGroups,
+                enableCache,
+                1000,
+                sizeCalculator
             );
         }
 
         /// <summary>
-        /// 创建基于数组的LayoutAutoSizeProvider
+        /// 创建基于数组的StandardVariableSizeAdapter
         /// </summary>
-        public static LayoutAutoSizeProvider CreateForArray<T>(
+        public static StandardVariableSizeAdapter CreateForArray<T>(
             RectTransform template,
             T[] dataArray,
+            ICellBinder binder,
+            Action<RectTransform, object> templateBinder,
             float fixedWidth,
             float minHeight = 60f,
             float maxHeight = 300f,
@@ -67,37 +78,46 @@ namespace SimpleToolkits
         {
             if (template == null) throw new ArgumentNullException(nameof(template));
             if (dataArray == null) throw new ArgumentNullException(nameof(dataArray));
+            if (binder == null) throw new ArgumentNullException(nameof(binder));
 
             Func<int, object> dataGetter = index => 
                 index >= 0 && index < dataArray.Length ? dataArray[index] : null;
 
-            Func<int, object, Vector2> calculator = null;
+            Func<int, object, Vector2> sizeCalculator = null;
             if (customSizeCalculator != null)
             {
-                calculator = (index, data) => 
-                    data is T typedData ? customSizeCalculator(index, typedData) : Vector2.zero;
+                sizeCalculator = (index, data) => 
+                {
+                    if (data is T typedData)
+                        return customSizeCalculator.Invoke(index, typedData);
+                    return Vector2.zero;
+                };
             }
 
-            return new LayoutAutoSizeProvider(
-                template: template,
-                countGetter: () => dataArray.Length,
-                dataGetter: dataGetter,
-                templateBinder: null,
-                fixedWidth: fixedWidth,
-                minHeight: minHeight,
-                maxHeight: maxHeight,
-                useLayoutGroups: useLayoutGroups,
-                enableCache: enableCache,
-                customSizeCalculator: calculator
+            return new StandardVariableSizeAdapter(
+                template,
+                () => dataArray.Length,
+                dataGetter,
+                binder,
+                templateBinder,
+                fixedWidth,
+                minHeight,
+                maxHeight,
+                useLayoutGroups,
+                enableCache,
+                1000,
+                sizeCalculator
             );
         }
 
         /// <summary>
-        /// 创建基于固定数量的LayoutAutoSizeProvider
+        /// 创建基于固定数量的StandardVariableSizeAdapter
         /// </summary>
-        public static LayoutAutoSizeProvider CreateForFixedCount(
+        public static StandardVariableSizeAdapter CreateForFixedCount(
             RectTransform template,
             int count,
+            ICellBinder binder,
+            Action<RectTransform, object> templateBinder,
             float fixedWidth,
             float minHeight = 60f,
             float maxHeight = 300f,
@@ -106,198 +126,173 @@ namespace SimpleToolkits
             Func<int, object, Vector2> customSizeCalculator = null)
         {
             if (template == null) throw new ArgumentNullException(nameof(template));
+            if (binder == null) throw new ArgumentNullException(nameof(binder));
 
             Func<int, object> dataGetter = index => index; // 简单返回索引作为数据
 
-            return new LayoutAutoSizeProvider(
-                template: template,
-                countGetter: () => count,
-                dataGetter: dataGetter,
-                templateBinder: null,
-                fixedWidth: fixedWidth,
-                minHeight: minHeight,
-                maxHeight: maxHeight,
-                useLayoutGroups: useLayoutGroups,
-                enableCache: enableCache,
-                customSizeCalculator: customSizeCalculator
+            return new StandardVariableSizeAdapter(
+                template,
+                () => count,
+                dataGetter,
+                binder,
+                templateBinder,
+                fixedWidth,
+                minHeight,
+                maxHeight,
+                useLayoutGroups,
+                enableCache,
+                1000,
+                customSizeCalculator
             );
         }
         #endregion
 
-        #region 性能优化扩展
+        #region 缓存管理
         /// <summary>
-        /// 预热LayoutAutoSizeProvider的缓存
+        /// 预热StandardVariableSizeAdapter的缓存
         /// </summary>
         public static void PreheatCache(
-            this LayoutAutoSizeProvider provider,
+            this StandardVariableSizeAdapter provider,
             IScrollLayout layout,
             Vector2 viewportSize,
-            int? startIndex = null,
-            int? count = null)
+            int startIndex,
+            int count)
         {
-            if (provider == null || layout == null) return;
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
 
-            var totalCount = provider.GetType().GetProperty("Count")?.GetValue(provider) as int? ?? 0;
-            if (totalCount <= 0) return;
-
-            var start = startIndex ?? 0;
-            var end = Math.Min(start + (count ?? totalCount), totalCount);
-
-            // 使用反射调用预热方法
-            var method = provider.GetType().GetMethod("PreheatCache");
-            method?.Invoke(provider, new object[] { start, end - start, viewportSize, layout });
-        }
-
-        /// <summary>
-        /// 获取LayoutAutoSizeProvider的缓存统计信息
-        /// </summary>
-        public static (int cacheCount, int maxCacheSize, float cacheUsage) GetCacheStats(
-            this LayoutAutoSizeProvider provider)
-        {
-            if (provider == null) return (0, 0, 0f);
-
-            // 使用反射调用统计方法
-            var method = provider.GetType().GetMethod("GetCacheStats");
-            var result = method?.Invoke(provider, null);
-
-            if (result is ValueTuple<int, int, float> stats)
+            try
             {
-                return stats;
+                provider.PreheatCache(layout, viewportSize, startIndex, count);
             }
-
-            return (0, 0, 0f);
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[StandardVariableSizeAdapterExtensions] 预热缓存失败: {e.Message}");
+            }
         }
 
         /// <summary>
-        /// 批量预热多个LayoutAutoSizeProvider
+        /// 获取StandardVariableSizeAdapter的缓存统计信息
         /// </summary>
-        public static void BatchPreheatCache(
-            IEnumerable<LayoutAutoSizeProvider> providers,
+        public static (int cacheCount, int maxCacheSize, double cacheUsage) GetCacheStats(
+            this StandardVariableSizeAdapter provider)
+        {
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
+
+            return provider.GetCacheStats();
+        }
+
+        /// <summary>
+        /// 批量预热多个StandardVariableSizeAdapter
+        /// </summary>
+        public static void PreheatCache(
+            this IEnumerable<StandardVariableSizeAdapter> providers,
             IScrollLayout layout,
             Vector2 viewportSize,
-            int maxItemsPerProvider = 100)
+            int startIndex,
+            int count)
         {
-            if (providers == null || layout == null) return;
+            if (providers == null) throw new ArgumentNullException(nameof(providers));
 
             foreach (var provider in providers)
             {
                 try
                 {
-                    provider.PreheatCache(layout, viewportSize, 0, maxItemsPerProvider);
+                    provider.PreheatCache(layout, viewportSize, startIndex, count);
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning($"[AutoSizeProviderExtensions] 预热缓存失败: {e.Message}");
+                    Debug.LogWarning($"[StandardVariableSizeAdapterExtensions] 预热缓存失败: {e.Message}");
                 }
             }
         }
         #endregion
 
-        #region 诊断和调试
+        #region 诊断和测试
         /// <summary>
-        /// 获取LayoutAutoSizeProvider的诊断信息
+        /// 获取StandardVariableSizeAdapter的诊断信息
         /// </summary>
         public static string GetDiagnostics(
-            this LayoutAutoSizeProvider provider,
+            this StandardVariableSizeAdapter provider,
             RectTransform template)
         {
-            if (provider == null) return "Provider为空";
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
 
-            var diagnostics = "=== LayoutAutoSizeProvider 诊断信息 ===\n";
-            
-            // 获取缓存统计
             var stats = provider.GetCacheStats();
+            var diagnostics = "=== StandardVariableSizeAdapter 诊断信息 ===\n";
             diagnostics += $"缓存统计: {stats.cacheCount}/{stats.maxCacheSize} ({stats.cacheUsage:P1})\n";
-
-            // 获取模板诊断信息
-            if (template != null)
-            {
-                diagnostics += "\n=== 模板诊断信息 ===\n";
-                diagnostics += LayoutUtils.GetLayoutDiagnostics(template);
-            }
-
+            diagnostics += $"模板状态: {(template != null ? "正常" : "空引用")}\n";
+            
             return diagnostics;
         }
 
         /// <summary>
-        /// 测试LayoutAutoSizeProvider的性能
+        /// 测试StandardVariableSizeAdapter的性能
         /// </summary>
         public static (double averageTimeMs, int testCount) TestPerformance(
-            this LayoutAutoSizeProvider provider,
+            this StandardVariableSizeAdapter provider,
             IScrollLayout layout,
             Vector2 viewportSize,
             int testCount = 1000)
         {
-            if (provider == null || layout == null) return (0, 0);
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
 
-            var totalCount = provider.GetType().GetProperty("Count")?.GetValue(provider) as int? ?? 0;
-            if (totalCount <= 0) return (0, 0);
-
-            var random = new System.Random();
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
+            var startTime = Time.realtimeSinceStartup;
+            
             for (int i = 0; i < testCount; i++)
             {
-                var index = random.Next(0, totalCount);
-                provider.GetItemSize(index, viewportSize, layout);
+                provider.GetItemSize(i % 100, viewportSize, layout);
             }
+            
+            var endTime = Time.realtimeSinceStartup;
+            var totalTime = endTime - startTime;
+            var averageTimeMs = (totalTime / testCount) * 1000;
 
-            stopwatch.Stop();
-
-            var averageTimeMs = stopwatch.Elapsed.TotalMilliseconds / testCount;
             return (averageTimeMs, testCount);
         }
         #endregion
 
         #region 链式配置
         /// <summary>
-        /// 链式配置LayoutAutoSizeProvider
+        /// 链式配置StandardVariableSizeAdapter
         /// </summary>
-        public static LayoutAutoSizeProvider Configure(
-            this LayoutAutoSizeProvider provider,
-            Action<LayoutAutoSizeProvider> configuration)
+        public static StandardVariableSizeAdapter Configure(
+            this StandardVariableSizeAdapter provider,
+            Action<StandardVariableSizeAdapter> configuration)
         {
-            if (provider != null && configuration != null)
-            {
-                configuration(provider);
-            }
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+
+            configuration.Invoke(provider);
             return provider;
         }
 
         /// <summary>
-        /// 启用缓存
+        /// 配置缓存设置
         /// </summary>
-        public static LayoutAutoSizeProvider WithCache(
-            this LayoutAutoSizeProvider provider,
-            bool enabled = true,
+        public static StandardVariableSizeAdapter WithCache(
+            this StandardVariableSizeAdapter provider,
+            bool enableCache,
             int maxCacheSize = 1000)
         {
-            if (provider != null)
-            {
-                // 使用反射设置缓存属性
-                var enableCacheField = provider.GetType().GetField("_enableCache", 
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var maxCacheSizeField = provider.GetType().GetField("_maxCacheSize", 
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
 
-                if (enableCacheField != null) enableCacheField.SetValue(provider, enabled);
-                if (maxCacheSizeField != null) maxCacheSizeField.SetValue(provider, maxCacheSize);
-            }
+            // 注意：这些参数在构造后不能修改，这里只是为了保持API一致性
+            Debug.LogWarning("[StandardVariableSizeAdapterExtensions] 缓存参数只能在构造函数中设置");
             return provider;
         }
 
         /// <summary>
-        /// 设置自定义尺寸计算器
+        /// 配置自定义尺寸计算器
         /// </summary>
-        public static LayoutAutoSizeProvider WithCustomCalculator(
-            this LayoutAutoSizeProvider provider,
-            Func<int, object, Vector2> calculator)
+        public static StandardVariableSizeAdapter WithCustomCalculator<T>(
+            this StandardVariableSizeAdapter provider,
+            Func<int, T, Vector2> calculator)
         {
-            if (provider != null)
-            {
-                var method = provider.GetType().GetMethod("SetCustomSizeCalculator");
-                method?.Invoke(provider, new object[] { calculator });
-            }
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
+            if (calculator == null) throw new ArgumentNullException(nameof(calculator));
+
+            // 注意：自定义计算器只能在构造函数中设置
+            Debug.LogWarning("[StandardVariableSizeAdapterExtensions] 自定义计算器只能在构造函数中设置");
             return provider;
         }
         #endregion

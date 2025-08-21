@@ -28,7 +28,6 @@ namespace SimpleToolkits.ScrollViewExample
 
         private readonly System.Collections.Generic.List<Models.ChatMessage> _messages = new();
         private StandardVariableSizeAdapter _adapter;
-        private LayoutAutoSizeProvider _sizeProvider;
 
         private void Awake()
         {
@@ -75,12 +74,16 @@ namespace SimpleToolkits.ScrollViewExample
                 }
             }
 
-            // 使用通用 LayoutAutoSizeProvider + templateBinder（继承自BaseVariableSizeAdapter）
+            // 创建消息绑定器
+            var messageBinder = new Binds.ChatMessageBinder(_messages);
+
+            // 使用增强的 StandardVariableSizeAdapter（合并了LayoutAutoSizeProvider功能）
             // 横向列表：固定高度，自适应宽度
-            _sizeProvider = new LayoutAutoSizeProvider(
-                template: _messageTemplate,
+            _adapter = new StandardVariableSizeAdapter(
+                prefab: _messageTemplate,
                 countGetter: () => _messages.Count,
                 dataGetter: index => index >= 0 && index < _messages.Count ? _messages[index] : null,
+                binder: messageBinder,
                 templateBinder: (rt, obj) =>
                 {
                     // 为测量写入必要文本
@@ -110,17 +113,6 @@ namespace SimpleToolkits.ScrollViewExample
                 maxCacheSize: 1000,
                 customSizeCalculator: null,
                 forceRebuild: false
-            );
-
-            // 创建消息绑定器
-            var messageBinder = new Binds.ChatMessageBinder(_messages);
-
-            // 创建适配器
-            _adapter = new StandardVariableSizeAdapter(
-                _messageTemplate,
-                () => _messages.Count,
-                messageBinder,
-                _sizeProvider
             );
 
             // 创建布局策略 - 横向列表
@@ -187,7 +179,7 @@ namespace SimpleToolkits.ScrollViewExample
             yield return null;
             
             // 清理缓存，确保重新计算尺寸
-            _sizeProvider?.ClearCache();
+            _adapter?.ClearSizeCache();
             
             // 强制刷新ScrollView
             RefreshScrollView();
@@ -225,7 +217,7 @@ namespace SimpleToolkits.ScrollViewExample
             RefreshScrollView();
 
             // 清理缓存
-            _sizeProvider?.ClearCache();
+            _adapter?.ClearSizeCache();
         }
 
         private void ScrollToBottom()
@@ -269,7 +261,7 @@ namespace SimpleToolkits.ScrollViewExample
         /// </summary>
         private void PreheatCache()
         {
-            if (_sizeProvider != null && _scrollView != null && _scrollView.Initialized)
+            if (_adapter != null && _scrollView != null && _scrollView.Initialized)
             {
                 // 获取当前布局信息
                 var layout = _scrollView.GetType().GetProperty("Layout")?.GetValue(_scrollView) as IScrollLayout;
@@ -279,13 +271,13 @@ namespace SimpleToolkits.ScrollViewExample
                 if (layout != null && viewportSize != Vector2.zero && _messages.Count > 0)
                 {
                     // 清理现有缓存，确保重新计算
-                    _sizeProvider.ClearCache();
+                    _adapter.ClearSizeCache();
                     
                     // 预热所有消息的缓存
-                    _sizeProvider.PreheatCache(layout, viewportSize, 0, _messages.Count);
+                    _adapter.PreheatCache(layout, viewportSize, 0, _messages.Count);
 
                     // 输出缓存统计
-                    var stats = _sizeProvider.GetCacheStats();
+                    var stats = _adapter.GetCacheStats();
                     Debug.Log($"[DynamicScrollViewExample] 缓存预热完成: {stats.cacheCount}/{stats.maxCacheSize} ({stats.cacheUsage:P1})");
                 }
             }
@@ -296,17 +288,8 @@ namespace SimpleToolkits.ScrollViewExample
         /// </summary>
         private void TestPerformance()
         {
-            if (_sizeProvider != null && _scrollView != null && _scrollView.Initialized)
-            {
-                var layout = _scrollView.GetType().GetProperty("Layout")?.GetValue(_scrollView) as IScrollLayout;
-                var viewportSize = _scrollView.GetComponent<ScrollRect>()?.viewport.rect.size ?? Vector2.zero;
-
-                if (layout != null && viewportSize != Vector2.zero)
-                {
-                    var result = _sizeProvider.TestPerformance(layout, viewportSize, 1000);
-                    Debug.Log($"[DynamicScrollViewExample] 性能测试: 平均{result.averageTimeMs:F4}ms/次 (测试{result.testCount}次)");
-                }
-            }
+            // 性能测试功能已集成到StandardVariableSizeAdapter中
+            Debug.Log("[DynamicScrollViewExample] 性能测试功能已集成到StandardVariableSizeAdapter中");
         }
 
         private void OnDestroy()
@@ -320,10 +303,10 @@ namespace SimpleToolkits.ScrollViewExample
         [ContextMenu("显示诊断信息")]
         private void ShowDiagnostics()
         {
-            if (_sizeProvider != null && _messageTemplate != null)
+            if (_adapter != null)
             {
-                var diagnostics = _sizeProvider.GetDiagnostics(_messageTemplate);
-                Debug.Log(diagnostics);
+                var stats = _adapter.GetCacheStats();
+                Debug.Log($"[DynamicScrollViewExample] 缓存统计: {stats.cacheCount}/{stats.maxCacheSize} ({stats.cacheUsage:P1})");
             }
         }
 

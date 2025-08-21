@@ -38,7 +38,6 @@ namespace SimpleToolkits.ScrollViewExample
         private readonly List<Models.ChatMessage> _messages = new();
         private readonly List<Models.ChatMessage> _filteredMessages = new();
         private StandardVariableSizeAdapter _adapter;
-        private LayoutAutoSizeProvider _sizeProvider;
         private MessageType _currentFilter = MessageType.All;
         private SortType _currentSort = SortType.Time;
         private string _searchTerm = string.Empty;
@@ -109,11 +108,15 @@ namespace SimpleToolkits.ScrollViewExample
 
         private void InitializeComponents()
         {
-            // 使用通用 LayoutAutoSizeProvider + templateBinder（继承自BaseVariableSizeAdapter）
-            _sizeProvider = new LayoutAutoSizeProvider(
-                template: _messageTemplate,
+            // 创建消息绑定器
+            var messageBinder = new Binds.ChatMessageBinder(_filteredMessages);
+
+            // 使用增强的 StandardVariableSizeAdapter（合并了LayoutAutoSizeProvider功能）
+            _adapter = new StandardVariableSizeAdapter(
+                prefab: _messageTemplate,
                 countGetter: () => _filteredMessages.Count,
                 dataGetter: index => index >= 0 && index < _filteredMessages.Count ? _filteredMessages[index] : null,
+                binder: messageBinder,
                 templateBinder: (rt, obj) =>
                 {
                     var senderTMP = rt.Find<TextMeshProUGUI>("SenderText");
@@ -142,17 +145,6 @@ namespace SimpleToolkits.ScrollViewExample
                 maxCacheSize: 1000,
                 customSizeCalculator: null,
                 forceRebuild: false
-            );
-
-            // 创建消息绑定器
-            var messageBinder = new Binds.ChatMessageBinder(_filteredMessages);
-
-            // 创建适配器
-            _adapter = new StandardVariableSizeAdapter(
-                _messageTemplate,
-                () => _filteredMessages.Count,
-                messageBinder,
-                _sizeProvider
             );
 
             // 创建布局策略 - 纵向列表
@@ -237,7 +229,7 @@ namespace SimpleToolkits.ScrollViewExample
             RefreshScrollView();
 
             // 清理缓存
-            _sizeProvider?.ClearCache();
+            _adapter?.ClearSizeCache();
         }
 
         private void ScrollToBottom()
@@ -414,16 +406,16 @@ namespace SimpleToolkits.ScrollViewExample
         /// </summary>
         private void PreheatCache()
         {
-            if (_sizeProvider != null && _scrollView != null && _scrollView.Initialized)
+            if (_adapter != null && _scrollView != null && _scrollView.Initialized)
             {
                 var layout = _scrollView.GetType().GetProperty("Layout")?.GetValue(_scrollView) as IScrollLayout;
                 var viewportSize = _scrollView.GetComponent<ScrollRect>()?.viewport.rect.size ?? Vector2.zero;
 
                 if (layout != null && viewportSize != Vector2.zero)
                 {
-                    _sizeProvider.PreheatCache(layout, viewportSize, 0, Mathf.Min(10, _filteredMessages.Count));
+                    _adapter.PreheatCache(layout, viewportSize, 0, Mathf.Min(10, _filteredMessages.Count));
 
-                    var stats = _sizeProvider.GetCacheStats();
+                    var stats = _adapter.GetCacheStats();
                     Debug.Log($"[AdvancedDynamicScrollViewExample] 缓存预热完成: {stats.cacheCount}/{stats.maxCacheSize}");
                 }
             }
@@ -457,7 +449,7 @@ namespace SimpleToolkits.ScrollViewExample
         [ContextMenu("测试性能")]
         private void RunPerformanceTest()
         {
-            if (_sizeProvider != null && _scrollView != null && _scrollView.Initialized)
+            if (_adapter != null && _scrollView != null && _scrollView.Initialized)
             {
                 var layout = _scrollView.GetType().GetProperty("Layout")?.GetValue(_scrollView) as IScrollLayout;
                 var viewportSize = _scrollView.GetComponent<ScrollRect>()?.viewport.rect.size ?? Vector2.zero;

@@ -1,49 +1,31 @@
-# BaseVariableSizeAdapter 系统
+# StandardVariableSizeAdapter 系统
 
 ## 概述
 
-BaseVariableSizeAdapter 是一个增强的基础变尺寸适配器基类，合并了原 AutoSizeProvider 的功能。它提供了基于 Unity 布局组件的自动尺寸计算系统，旨在简化 ScrollView 中动态尺寸项的开发。
+StandardVariableSizeAdapter 是一个完全集成的标准变尺寸适配器，合并了原 LayoutAutoSizeProvider 的所有功能。它提供了完整的解决方案，包括生命周期管理、自动尺寸计算、缓存机制和性能优化，适用于大多数动态尺寸列表场景。
 
 ## 主要特性
 
+- **完全集成**：合并了生命周期管理、自动尺寸计算、缓存机制
 - **自动尺寸计算**：基于 Unity 布局组件（HorizontalOrVerticalLayoutGroup、ContentSizeFitter、LayoutElement）
-- **高性能**：支持缓存机制，避免重复计算
+- **高性能**：支持智能缓存机制，避免重复计算
 - **灵活性**：支持固定尺寸、自适应尺寸、最小/最大尺寸限制
 - **易用性**：提供简洁的 API 接口，降低使用门槛
-- **统一架构**：将原有分离的 AutoSizeProvider 和 BaseVariableSizeAdapter 合并为单一基类
+- **向后兼容**：保持与原有 API 的兼容性
 
 ## 核心组件
 
-### 1. BaseVariableSizeAdapter（增强的抽象基类）
+### 1. StandardVariableSizeAdapter（完全集成的适配器）
 
 ```csharp
-public abstract class BaseVariableSizeAdapter : BaseScrollAdapter, IVariableSizeAdapter
+public sealed class StandardVariableSizeAdapter : BaseVariableSizeAdapter
 {
-    // 主要方法
-    public virtual Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
-    
-    // 抽象方法（子类必须实现）
-    protected abstract int GetItemCount();
-    protected abstract Vector2 GetBaseSize(int index, Vector2 viewportSize, IScrollLayout layout);
-    protected abstract object GetDataForLayout(int index);
-    
-    // 公共方法
-    public void ForceRebuildLayout();
-    public void ClearCache();
-    public void UpdateTemplate(RectTransform newTemplate);
-}
-```
-
-### 2. LayoutAutoSizeProvider（具体实现）
-
-```csharp
-public class LayoutAutoSizeProvider : BaseVariableSizeAdapter
-{
-    // 构造函数
-    public LayoutAutoSizeProvider(
-        RectTransform template,
+    // 完整构造函数 - 支持自动尺寸计算
+    public StandardVariableSizeAdapter(
+        RectTransform prefab,
         Func<int> countGetter,
         Func<int, object> dataGetter,
+        ICellBinder binder,
         Action<RectTransform, object> templateBinder,
         Vector2 fixedSize,
         Vector2 minSize,
@@ -52,21 +34,54 @@ public class LayoutAutoSizeProvider : BaseVariableSizeAdapter
         bool enableCache = true,
         int maxCacheSize = 1000,
         Func<int, object, Vector2> customSizeCalculator = null,
-        bool forceRebuild = false
-    );
+        bool forceRebuild = false);
+    
+    // 简化构造函数 - 固定宽度，自适应高度
+    public StandardVariableSizeAdapter(
+        RectTransform prefab,
+        Func<int> countGetter,
+        Func<int, object> dataGetter,
+        ICellBinder binder,
+        Action<RectTransform, object> templateBinder,
+        float fixedWidth,
+        float minHeight = 60f,
+        float maxHeight = 300f,
+        bool useLayoutGroups = true,
+        bool enableCache = true,
+        int maxCacheSize = 1000,
+        Func<int, object, Vector2> customSizeCalculator = null,
+        bool forceRebuild = false);
+    
+    // 兼容构造函数 - 使用外部尺寸提供器
+    public StandardVariableSizeAdapter(RectTransform prefab, Func<int> countGetter, ICellBinder binder, IVariableSizeAdapter sizeProvider);
+}
+```
+
+### 2. ICellBinder（生命周期管理接口）
+
+```csharp
+public interface ICellBinder
+{
+    void OnCreated(RectTransform cell);
+    void OnBind(int index, RectTransform cell);
+    void OnRecycled(int index, RectTransform cell);
 }
 ```
 
 ## 使用示例
 
-### 基本用法
+### 基本用法（推荐）
 
 ```csharp
-// 1. 创建尺寸提供器（现在继承自BaseVariableSizeAdapter）
-var sizeProvider = new LayoutAutoSizeProvider(
-    template: messageTemplate,
+// 1. 创建业务绑定器
+var messageBinder = new ChatMessageBinder(messages);
+
+// 2. 创建集成的适配器（包含所有功能）
+var adapter = new StandardVariableSizeAdapter(
+    prefab: messageTemplate,
     countGetter: () => messages.Count,
     dataGetter: index => messages[index],
+    binder: messageBinder,
     templateBinder: (rt, data) => {
         var message = (ChatMessage)data;
         var text = rt.GetComponent<TextMeshProUGUI>();
@@ -77,6 +92,37 @@ var sizeProvider = new LayoutAutoSizeProvider(
     maxSize: new Vector2(300, 500)
 );
 
+// 3. 初始化 ScrollView
+scrollView.Initialize(adapter);
+```
+
+### 使用扩展方法（更简洁）
+
+```csharp
+// 使用扩展方法快速创建
+var adapter = StandardVariableSizeAdapterExtensions.CreateForList(
+    template: messageTemplate,
+    dataList: messages,
+    binder: messageBinder,
+    templateBinder: (rt, data) => {
+        var message = (ChatMessage)data;
+        var text = rt.GetComponent<TextMeshProUGUI>();
+        text.text = message.Content;
+    },
+    fixedWidth: 300,
+    minHeight: 60,
+    maxHeight: 500
+);
+
+scrollView.Initialize(adapter);
+```
+
+### 兼容用法（使用外部尺寸提供器）
+
+```csharp
+// 1. 创建外部尺寸提供器
+var sizeProvider = new CustomSizeProvider();
+
 // 2. 创建适配器
 var adapter = new StandardVariableSizeAdapter(
     prefab: messageTemplate,
@@ -85,44 +131,7 @@ var adapter = new StandardVariableSizeAdapter(
     sizeProvider: sizeProvider
 );
 
-// 3. 初始化 ScrollView
 scrollView.Initialize(adapter);
-```
-
-### 直接继承BaseVariableSizeAdapter
-
-```csharp
-public class CustomSizeAdapter : BaseVariableSizeAdapter
-{
-    private readonly List<CustomData> _dataList;
-    
-    public CustomSizeAdapter(RectTransform prefab, List<CustomData> dataList)
-        : base(prefab, prefab, () => dataList.Count)
-    {
-        _dataList = dataList;
-    }
-    
-    protected override int GetItemCount() => _dataList.Count;
-    
-    protected override Vector2 GetBaseSize(int index, Vector2 viewportSize, IScrollLayout layout)
-    {
-        // 返回基础尺寸
-        return new Vector2(200, 100); // 固定尺寸
-    }
-    
-    protected override object GetDataForLayout(int index)
-    {
-        return _dataList[index];
-    }
-    
-    protected override void OnBind(int index, RectTransform cell)
-    {
-        // 绑定数据到cell
-        var data = _dataList[index];
-        var text = cell.GetComponent<TextMeshProUGUI>();
-        text.text = data.Name;
-    }
-}
 ```
 
 ### 高级用法

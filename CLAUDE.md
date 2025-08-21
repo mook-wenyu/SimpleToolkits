@@ -45,7 +45,7 @@ Simple Toolkits is a comprehensive Unity game development framework that provide
 - **PathfindingKit**: A* pathfinding implementation
 - **PoolKit**: Object pooling for performance optimization
 - **ResKit**: Resource loading and management with YooAsset integration
-- **ScrollViewKit**: High-performance scroll view implementation
+- **ScrollViewKit**: High-performance scroll view implementation with AutoSizeProvider system
 - **UIPanelKit**: UI panel management system
 - **WebKit**: Web request handling
 
@@ -120,6 +120,60 @@ public class MyService : ISingleton, SingletonCreator<MyService>
 - **Generated JSON**: `Assets/GameRes/JsonConfigs/`
 - **Runtime Source**: `Assets/SimpleToolkits/Runtime/`
 - **Editor Tools**: `Assets/SimpleToolkits/Editor/`
+
+## ScrollViewKit 详细说明
+
+### 架构特点
+
+ScrollViewKit 是一个高性能的滚动视图系统，支持动态尺寸计算和虚拟化滚动。
+
+### 核心接口
+
+**统一的变尺寸适配器接口**：
+```csharp
+public interface IVariableSizeAdapter
+{
+    Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
+}
+```
+
+### AutoSizeProvider 系统
+
+- **AutoSizeProvider**: 抽象基类，提供基于 Unity 布局组件的自动尺寸计算
+- **LayoutAutoSizeProvider**: 具体实现，支持缓存机制和性能优化
+- **特点**: 高性能、易用性、灵活性、支持多种布局场景
+
+### 使用模式
+
+```csharp
+// 1. 创建尺寸提供器
+var sizeProvider = new LayoutAutoSizeProvider(
+    template: messageTemplate,
+    countGetter: () => messages.Count,
+    dataGetter: index => messages[index],
+    templateBinder: (rt, data) => {
+        // 绑定数据到模板
+    }
+);
+
+// 2. 创建适配器
+var adapter = new StandardVariableSizeAdapter(
+    prefab: messageTemplate,
+    countGetter: () => messages.Count,
+    binder: messageBinder,
+    sizeProvider: sizeProvider
+);
+
+// 3. 初始化 ScrollView
+scrollView.Initialize(adapter);
+```
+
+### 性能优化
+
+- 缓存机制避免重复计算
+- 支持预热缓存提高初始性能
+- 智能布局重建减少性能开销
+- 对象池管理提高内存效率
 
 ## Dependencies
 

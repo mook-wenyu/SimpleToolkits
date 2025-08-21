@@ -143,7 +143,6 @@ namespace SimpleToolkits.ScrollViewExample
                 maxHeight: _maxHeight,
                 enableCache: true,
                 maxCacheSize: 1000,
-                customSizeCalculator: null,
                 forceRebuild: false
             );
 
@@ -152,16 +151,17 @@ namespace SimpleToolkits.ScrollViewExample
             if (content != null)
             {
                 var layout = content.gameObject.AddComponent<VerticalLayout>();
-                layout.SetLayout(
-                    spacingY: 4f,
-                    paddingLeft: 16f,
-                    paddingTop: 16f,
-                    paddingRight: 16f,
-                    paddingBottom: 16f,
-                    controlChildWidth: true,
-                    controlChildHeight: false,
-                    reverse: false
-                );
+                // 在 Inspector 中配置布局参数
+                layout.spacing = 4f;
+                layout.padding = new RectOffset(16, 16, 16, 16);
+                layout.controlChildWidth = true;
+                layout.controlChildHeight = false;
+                layout.reverse = false;
+            }
+            else
+            {
+                Debug.LogError("无法找到 ScrollView 的 Content 对象！", this);
+                return;
             }
 
             // 初始化ScrollView

@@ -84,7 +84,6 @@ namespace SimpleToolkits
         private readonly Func<int> _countGetter;
         private readonly Func<int, object> _dataGetter;
         private readonly Action<RectTransform, object> _templateBinder;
-        private readonly Func<int, object, Vector2> _customSizeCalculator;
         private readonly Dictionary<int, Vector2> _sizeCache = new Dictionary<int, Vector2>();
         private readonly bool _enableCache;
         private readonly int _maxCacheSize;
@@ -109,7 +108,6 @@ namespace SimpleToolkits
         /// <param name="useLayoutGroups">是否使用布局组</param>
         /// <param name="enableCache">是否启用缓存</param>
         /// <param name="maxCacheSize">最大缓存大小</param>
-        /// <param name="customSizeCalculator">自定义尺寸计算器</param>
         /// <param name="forceRebuild">是否强制重建布局</param>
         public StandardVariableSizeAdapter(
             RectTransform prefab,
@@ -126,7 +124,6 @@ namespace SimpleToolkits
             bool useLayoutGroups = true,
             bool enableCache = true,
             int maxCacheSize = 1000,
-            Func<int, object, Vector2> customSizeCalculator = null,
             bool forceRebuild = false)
             : base(prefab, countGetter, new Vector2(fixedWidth, fixedHeight), 
                    new Vector2(minWidth, minHeight), new Vector2(maxWidth, maxHeight), useLayoutGroups, forceRebuild)
@@ -135,7 +132,6 @@ namespace SimpleToolkits
             _countGetter = countGetter ?? throw new ArgumentNullException(nameof(countGetter));
             _dataGetter = dataGetter ?? throw new ArgumentNullException(nameof(dataGetter));
             _templateBinder = templateBinder;
-            _customSizeCalculator = customSizeCalculator;
             _enableCache = enableCache;
             _maxCacheSize = maxCacheSize;
         }
@@ -157,9 +153,8 @@ namespace SimpleToolkits
             bool useLayoutGroups = true,
             bool enableCache = true,
             int maxCacheSize = 1000,
-            Func<int, object, Vector2> customSizeCalculator = null,
             bool forceRebuild = false)
-            : this(prefab, () => dataList.Count, index => dataList[index], binder, templateBinder, fixedWidth, fixedHeight, minWidth, minHeight, maxWidth, maxHeight, useLayoutGroups, enableCache, maxCacheSize, customSizeCalculator, forceRebuild)
+            : this(prefab, () => dataList.Count, index => dataList[index], binder, templateBinder, fixedWidth, fixedHeight, minWidth, minHeight, maxWidth, maxHeight, useLayoutGroups, enableCache, maxCacheSize, forceRebuild)
         {
         }
 
@@ -195,12 +190,13 @@ namespace SimpleToolkits
             float minHeight = 60f,
             float maxHeight = 300f,
             bool enableCache = true,
-            int maxCacheSize = 1000)
+            int maxCacheSize = 1000,
+            bool forceRebuild = false)
         {
             return new StandardVariableSizeAdapter(
                 prefab, countGetter, dataGetter, binder, templateBinder,
                 fixedWidth, -1f, 0, minHeight, -1f, maxHeight,
-                true, enableCache, maxCacheSize);
+                true, enableCache, maxCacheSize, forceRebuild);
         }
 
         /// <summary>
@@ -216,12 +212,13 @@ namespace SimpleToolkits
             float minWidth = 60f,
             float maxWidth = 300f,
             bool enableCache = true,
-            int maxCacheSize = 1000)
+            int maxCacheSize = 1000,
+            bool forceRebuild = false)
         {
             return new StandardVariableSizeAdapter(
                 prefab, countGetter, dataGetter, binder, templateBinder,
                 -1f, fixedHeight, minWidth, 0, maxWidth, -1f,
-                true, enableCache, maxCacheSize);
+                true, enableCache, maxCacheSize, forceRebuild);
         }
 
         /// <summary>
@@ -236,12 +233,13 @@ namespace SimpleToolkits
             float fixedWidth,
             float fixedHeight,
             bool enableCache = true,
-            int maxCacheSize = 1000)
+            int maxCacheSize = 1000,
+            bool forceRebuild = false)
         {
             return new StandardVariableSizeAdapter(
                 prefab, countGetter, dataGetter, binder, templateBinder,
                 fixedWidth, fixedHeight, 0, 0, -1f, -1f,
-                true, enableCache, maxCacheSize);
+                true, enableCache, maxCacheSize, forceRebuild);
         }
         #endregion
 
@@ -305,16 +303,7 @@ namespace SimpleToolkits
         /// </summary>
         protected override Vector2 GetItemSizeInternal(int index, Vector2 viewportSize, IScrollLayout layout)
         {
-            // 如果有自定义计算器，优先使用
-            if (_customSizeCalculator != null)
-            {
-                var data = _dataGetter?.Invoke(index);
-                var customSize = _customSizeCalculator.Invoke(index, data);
-                if (customSize != Vector2.zero)
-                    return customSize;
-            }
-
-            // 否则使用模板测量
+            // 使用模板测量
             return MeasureWithTemplate(index, viewportSize, layout);
         }
 

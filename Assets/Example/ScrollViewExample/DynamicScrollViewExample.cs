@@ -8,7 +8,7 @@ namespace SimpleToolkits.ScrollViewExample
 {
     /// <summary>
     /// 动态ScrollView示例 - 使用新的BaseVariableSizeAdapter系统
-    /// 演示基本的动态聊天功能
+    /// 演示基本的纵向动态聊天功能
     /// </summary>
     public class DynamicScrollViewExample : MonoBehaviour
     {
@@ -22,9 +22,9 @@ namespace SimpleToolkits.ScrollViewExample
         [SerializeField] private TMP_InputField _messageInput;
 
         [Header("设置")]
-        [SerializeField] private float _minWidth = 100f;   // 横向列表最小宽度
-        [SerializeField] private float _maxWidth = 500f;   // 横向列表最大宽度
-        [SerializeField] private float _fixedHeight = 300f; // 横向列表固定高度
+        [SerializeField] private float _minHeight = 60f;   // 纵向列表最小高度
+        [SerializeField] private float _maxHeight = 300f;  // 纵向列表最大高度
+        [SerializeField] private float _fixedWidth = 300f; // 纵向列表固定宽度
 
         private readonly System.Collections.Generic.List<Models.ChatMessage> _messages = new();
         private StandardVariableSizeAdapter _adapter;
@@ -78,8 +78,8 @@ namespace SimpleToolkits.ScrollViewExample
             var messageBinder = new Binds.ChatMessageBinder(_messages);
 
             // 使用增强的 StandardVariableSizeAdapter（合并了LayoutAutoSizeProvider功能）
-            // 横向列表：固定高度，自适应宽度
-            _adapter = StandardVariableSizeAdapter.CreateForHorizontal(
+            // 纵向列表：固定宽度，自适应高度
+            _adapter = StandardVariableSizeAdapter.CreateForVertical(
                 prefab: _messageTemplate,
                 countGetter: () => _messages.Count,
                 dataGetter: index => index >= 0 && index < _messages.Count ? _messages[index] : null,
@@ -105,28 +105,29 @@ namespace SimpleToolkits.ScrollViewExample
                         if (contentTMP != null) contentTMP.text = s;
                     }
                 },
-                fixedHeight: _fixedHeight,
-                minWidth: _minWidth,
-                maxWidth: _maxWidth,
+                fixedWidth: _fixedWidth,
+                minHeight: _minHeight,
+                maxHeight: _maxHeight,
                 enableCache: true,
                 maxCacheSize: 1000
             );
 
-            // 创建布局策略 - 横向列表
+            // 创建布局策略 - 纵向列表
             var content = _scrollView.GetComponentInChildren<ScrollRect>()?.content;
             if (content != null)
             {
-                var layout = content.gameObject.AddComponent<HorizontalLayout>();
-                layout.SetLayout(
-                    spacingX: 4f,
-                    paddingLeft: 16f,
-                    paddingTop: 16f,
-                    paddingRight: 16f,
-                    paddingBottom: 16f,
-                    controlChildWidth: false,
-                    controlChildHeight: true,
-                    reverse: false
-                );
+                var layout = content.gameObject.GetComponent<VerticalLayout>();
+                // 在 Inspector 中配置布局参数
+                layout.spacing = 4f;
+                layout.padding = new RectOffset(16, 16, 16, 16);
+                layout.controlChildWidth = true;
+                layout.controlChildHeight = false;
+                layout.reverse = false;
+            }
+            else
+            {
+                Debug.LogError("无法找到 ScrollView 的 Content 对象！", this);
+                return;
             }
 
             // 初始化ScrollView

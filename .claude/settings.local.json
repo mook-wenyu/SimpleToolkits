@@ -16,7 +16,12 @@
       "Bash(git commit:*)",
       "Bash(git rm:*)",
       "Bash(git add:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(git push:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(rm:*)",
+      "Bash(grep:*)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": [],

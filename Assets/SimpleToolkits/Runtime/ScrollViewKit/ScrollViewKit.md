@@ -1,18 +1,151 @@
-# StandardVariableSizeAdapter 系统
+# ScrollViewKit 系统
 
 ## 概述
 
-StandardVariableSizeAdapter 是一个完全集成的标准变尺寸适配器，合并了原 LayoutAutoSizeProvider 的所有功能。它提供了完整的解决方案，包括智能尺寸计算、生命周期管理、缓存机制和性能优化，适用于各种动态尺寸列表场景。
+ScrollViewKit 是一个高性能的 Unity 滚动视图系统，支持动态尺寸计算和虚拟化滚动。它提供了完整的解决方案，包括智能尺寸计算、生命周期管理、缓存机制和性能优化，适用于各种动态尺寸列表场景。
 
-## 主要特性
+### 核心特性
 
-- **智能尺寸计算**：根据 IScrollLayout 布局模式自动优化尺寸计算
-- **完全集成**：合并了生命周期管理、自动尺寸计算、缓存机制
-- **自动尺寸计算**：基于 Unity 布局组件（HorizontalOrVerticalLayoutGroup、ContentSizeFitter、LayoutElement）
-- **高性能**：支持智能缓存机制，避免重复计算
-- **灵活性**：支持固定尺寸、自适应尺寸、最小/最大尺寸限制
-- **易用性**：提供简洁的 API 接口和专用构造函数
-- **布局感知**：根据纵向/横向/网格布局自动调整计算策略
+- **高性能虚拟化滚动**：支持大量数据的流畅显示
+- **智能尺寸计算**：基于 Unity 布局组件的自动尺寸计算
+- **多种布局支持**：纵向、横向、网格布局
+- **缓存优化**：智能缓存机制，避免重复计算
+- **生命周期管理**：完整的单元格创建、绑定、回收管理
+- **易用性**：简洁的 API 接口和专用构造函数
+
+## 系统架构
+
+### 核心接口
+
+```csharp
+// 变尺寸适配器接口
+public interface IVariableSizeAdapter
+{
+    Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
+}
+
+// 单元格绑定器接口
+public interface ICellBinder
+{
+    void OnCreated(RectTransform cell);
+    void OnBind(int index, RectTransform cell);
+    void OnRecycled(int index, RectTransform cell);
+}
+
+// 滚动布局接口
+public interface IScrollLayout
+{
+    bool IsVertical { get; }
+    bool ControlChildWidth { get; }
+    bool ControlChildHeight { get; }
+    Vector2 Spacing { get; }
+    RectOffset Padding { get; }
+    int ConstraintCount { get; }
+}
+```
+
+### 主要组件
+
+- **ScrollView**：主要的滚动视图控制器
+- **BaseVariableSizeAdapter**：变尺寸适配器基类
+- **StandardVariableSizeAdapter**：标准变尺寸适配器实现
+- **IScrollLayout**：布局策略接口（VerticalLayout、HorizontalLayout、GridLayout）
+- **ICellBinder**：单元格生命周期管理
+
+### 布局系统说明
+
+新的布局系统使用 MonoBehaviour 序列化字段，支持在 Unity Inspector 中直接配置：
+
+#### 继承结构
+```
+ScrollLayout (抽象基类)
+├── VerticalLayout (纵向布局)
+├── HorizontalLayout (横向布局)  
+└── GridLayout (网格布局)
+```
+
+#### 布局类型
+- **VerticalLayout**：纵向布局，固定宽度，自适应高度
+- **HorizontalLayout**：横向布局，固定高度，自适应宽度  
+- **GridLayout**：网格布局，支持纵向/横向滚动
+
+#### 基类功能 (ScrollLayout)
+所有布局组件都继承自 ScrollLayout 基类，提供统一的：
+- 内边距设置（padding）
+- 尺寸控制（controlChildWidth / controlChildHeight）
+- 反向排列（reverse）
+- 接口实现（IScrollLayout）
+
+#### 子类特有功能
+- **VerticalLayout**：spacing (垂直间距)
+- **HorizontalLayout**：spacing (水平间距)
+- **GridLayout**：spacingX/spacingY (水平和垂直间距), constraintCount (约束数量), isVertical (滚动方向)
+
+## 快速开始
+
+### 1. 纵向布局示例
+
+```csharp
+// 1. 创建数据绑定器
+var messageBinder = new ChatMessageBinder(messages);
+
+// 2. 创建纵向布局适配器
+var adapter = StandardVariableSizeAdapter.CreateForVertical(
+    prefab: messageTemplate,
+    countGetter: () => messages.Count,
+    dataGetter: index => messages[index],
+    binder: messageBinder,
+    templateBinder: (rt, data) => {
+        var message = (ChatMessage)data;
+        var text = rt.GetComponent<TextMeshProUGUI>();
+        text.text = message.Content;
+    },
+    fixedWidth: 300f,        // 固定宽度
+    minHeight: 60f,          // 最小高度
+    maxHeight: 300f,         // 最大高度
+    enableCache: true        // 启用缓存
+);
+
+// 3. 创建布局策略
+var content = scrollView.GetComponent<ScrollRect>().content;
+if (content == null)
+{
+    Debug.LogError("无法找到 ScrollView 的 Content 对象！");
+    return;
+}
+
+var layout = content.gameObject.AddComponent<VerticalLayout>();
+// 在 Inspector 中配置布局参数
+layout.spacing = 4f;
+layout.padding = new RectOffset(16, 16, 16, 16);
+layout.controlChildWidth = true;
+layout.controlChildHeight = false;
+layout.reverse = false;
+
+// 4. 初始化 ScrollView
+scrollView.Initialize(adapter);
+```
+
+### 2. 横向布局示例
+
+```csharp
+// 横向布局：固定高度，自适应宽度
+var adapter = StandardVariableSizeAdapter.CreateForHorizontal(
+    prefab: itemTemplate,
+    countGetter: () => items.Count,
+    dataGetter: index => items[index],
+    binder: itemBinder,
+    templateBinder: (rt, data) => {
+        var item = (ItemData)data;
+        var text = rt.GetComponent<TextMeshProUGUI>();
+        text.text = item.Name;
+    },
+    fixedHeight: 100f,       // 固定高度
+    minWidth: 60f,           // 最小宽度
+    maxWidth: 200f,          // 最大宽度
+    enableCache: true
+);
+```
 
 ## 核心组件
 
@@ -37,7 +170,6 @@ public sealed class StandardVariableSizeAdapter : BaseVariableSizeAdapter
         bool useLayoutGroups = true,
         bool enableCache = true,
         int maxCacheSize = 1000,
-        Func<int, object, Vector2> customSizeCalculator = null,
         bool forceRebuild = false);
     
     // 专用构造函数 - 纵向布局（固定宽度，自适应高度）
@@ -193,7 +325,6 @@ var adapter = new StandardVariableSizeAdapter(
     useLayoutGroups: true,   // 使用布局组
     enableCache: true,       // 启用缓存
     maxCacheSize: 1000,      // 最大缓存大小
-    customSizeCalculator: null,  // 自定义尺寸计算器
     forceRebuild: false      // 是否强制重建布局
 );
 
@@ -325,14 +456,17 @@ A: 在数据更新时调用 `ClearCache()` 清理缓存，然后刷新 ScrollVie
 
 ## 版本历史
 
-### v2.0.0
-- **重大更新**：智能尺寸计算系统
-- 新增固定和自适应尺寸参数支持
-- 新增专用构造函数：CreateForVertical、CreateForHorizontal、CreateForGrid
-- 优化 BaseVariableSizeAdapter 智能布局感知
-- 根据 IScrollLayout 布局模式自动优化尺寸计算
-- 更新扩展方法支持新的参数系统
+### v2.1.0
+- **API 简化**：删除 customSizeCalculator 参数
+- 简化尺寸计算逻辑，统一使用 templateBinder
+- 减少功能重叠，提高代码可维护性
 - 优化示例代码和文档
+
+**设计说明**：
+- 删除 customSizeCalculator 参数是因为它与 templateBinder 功能重叠
+- Unity 布局系统已经能处理绝大多数尺寸计算需求
+- 对于特殊需求，可以通过继承 BaseVariableSizeAdapter 来实现
+- 这样的简化让 API 更清晰，减少用户困惑
 
 ### v1.0.0
 - 初始版本

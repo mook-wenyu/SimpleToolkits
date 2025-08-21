@@ -6,8 +6,8 @@ namespace SimpleToolkits
     /// 纵向列表布局：从上到下，x 方向填充为 0。
     /// 用于ScrollView的纵向滚动布局。
     /// </summary>
-    [AddComponentMenu("Layout/Vertical Layout")]
-    public class VerticalLayout : MonoBehaviour, IScrollLayout
+    [AddComponentMenu("Layout/Scroll Vertical Layout")]
+    public class ScrollVerticalLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]

@@ -39,14 +39,14 @@ public class GridLayout : MonoBehaviour, IScrollLayout
 2. 点击"Add Component"按钮
 3. 导航到"Layout/"分类
 4. 选择需要的布局组件：
-   - **Vertical Layout**: 纵向滚动布局
+   - **Scroll Vertical Layout**: 纵向滚动布局
    - **Scroll Horizontal Layout**: 横向滚动布局
    - **Scroll Grid Layout**: 网格滚动布局
 
 ### 通过代码添加组件
 ```csharp
 // 纵向布局
-var verticalLayout = content.gameObject.AddComponent<VerticalLayout>();
+var verticalLayout = content.gameObject.AddComponent<ScrollVerticalLayout>();
 verticalLayout.spacing = 4f;
 verticalLayout.padding = new RectOffset(16, 16, 16, 16);
 
@@ -70,7 +70,7 @@ gridLayout.isVertical = true;
 - **命名空间**: `SimpleToolkits`
 - **位置**: Layout/
 - **特点**: 支持虚拟化、高性能、动态尺寸计算
-- **组件名**: VerticalLayout, ScrollHorizontalLayout, ScrollGridLayout
+- **组件名**: ScrollVerticalLayout, ScrollHorizontalLayout, ScrollGridLayout
 
 ### Unity UI布局组件
 - **用途**: 用于普通UI布局

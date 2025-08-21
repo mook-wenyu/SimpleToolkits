@@ -7,7 +7,7 @@ using SimpleToolkits;
 namespace SimpleToolkits.ScrollViewExample
 {
     /// <summary>
-    /// 动态ScrollView示例 - 使用新的AutoSizeProvider系统
+    /// 动态ScrollView示例 - 使用新的BaseVariableSizeAdapter系统
     /// 演示基本的动态聊天功能
     /// </summary>
     public class DynamicScrollViewExample : MonoBehaviour
@@ -75,7 +75,7 @@ namespace SimpleToolkits.ScrollViewExample
                 }
             }
 
-            // 使用通用 LayoutAutoSizeProvider + templateBinder（仅做测量绑定）
+            // 使用通用 LayoutAutoSizeProvider + templateBinder（继承自BaseVariableSizeAdapter）
             // 横向列表：固定高度，自适应宽度
             _sizeProvider = new LayoutAutoSizeProvider(
                 template: _messageTemplate,
@@ -161,8 +161,8 @@ namespace SimpleToolkits.ScrollViewExample
         {
             var initialMessages = new[]
             {
-                Models.ChatMessage.CreateSystem("欢迎使用基于AutoSizeProvider的聊天系统！"),
-                Models.ChatMessage.CreateNormal("开发者", "这个示例使用新的AutoSizeProvider自动计算尺寸。"),
+                Models.ChatMessage.CreateSystem("欢迎使用基于BaseVariableSizeAdapter的聊天系统！"),
+                Models.ChatMessage.CreateNormal("开发者", "这个示例使用新的BaseVariableSizeAdapter自动计算尺寸。"),
                 Models.ChatMessage.CreateNormal("开发者", "优点：开发效率高、维护简单、灵活性强！"),
                 Models.ChatMessage.CreateSuccess("所有组件工作正常。"),
                 Models.ChatMessage.CreateWarning("长消息会自动换行并调整高度。")

@@ -6,10 +6,10 @@ using UnityEngine.UI;
 namespace SimpleToolkits
 {
     /// <summary>
-    /// AutoSizeProvider扩展方法
+    /// BaseVariableSizeAdapter扩展方法
     /// 提供更便捷的创建和配置方法
     /// </summary>
-    public static class AutoSizeProviderExtensions
+    public static class BaseVariableSizeAdapterExtensions
     {
         #region 快捷创建方法
         /// <summary>

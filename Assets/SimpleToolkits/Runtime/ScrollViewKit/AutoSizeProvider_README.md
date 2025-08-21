@@ -1,8 +1,8 @@
-# AutoSizeProvider 系统
+# BaseVariableSizeAdapter 系统
 
 ## 概述
 
-AutoSizeProvider 是一个基于 Unity 布局组件的自动尺寸计算系统，旨在简化 ScrollView 中动态尺寸项的开发。
+BaseVariableSizeAdapter 是一个增强的基础变尺寸适配器基类，合并了原 AutoSizeProvider 的功能。它提供了基于 Unity 布局组件的自动尺寸计算系统，旨在简化 ScrollView 中动态尺寸项的开发。
 
 ## 主要特性
 
@@ -10,28 +10,34 @@ AutoSizeProvider 是一个基于 Unity 布局组件的自动尺寸计算系统�
 - **高性能**：支持缓存机制，避免重复计算
 - **灵活性**：支持固定尺寸、自适应尺寸、最小/最大尺寸限制
 - **易用性**：提供简洁的 API 接口，降低使用门槛
+- **统一架构**：将原有分离的 AutoSizeProvider 和 BaseVariableSizeAdapter 合并为单一基类
 
 ## 核心组件
 
-### 1. AutoSizeProvider（抽象基类）
+### 1. BaseVariableSizeAdapter（增强的抽象基类）
 
 ```csharp
-public abstract class AutoSizeProvider : IVariableSizeAdapter
+public abstract class BaseVariableSizeAdapter : BaseScrollAdapter, IVariableSizeAdapter
 {
     // 主要方法
-    public Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
+    public virtual Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
     
     // 抽象方法（子类必须实现）
     protected abstract int GetItemCount();
     protected abstract Vector2 GetBaseSize(int index, Vector2 viewportSize, IScrollLayout layout);
     protected abstract object GetDataForLayout(int index);
+    
+    // 公共方法
+    public void ForceRebuildLayout();
+    public void ClearCache();
+    public void UpdateTemplate(RectTransform newTemplate);
 }
 ```
 
 ### 2. LayoutAutoSizeProvider（具体实现）
 
 ```csharp
-public class LayoutAutoSizeProvider : AutoSizeProvider
+public class LayoutAutoSizeProvider : BaseVariableSizeAdapter
 {
     // 构造函数
     public LayoutAutoSizeProvider(
@@ -45,7 +51,7 @@ public class LayoutAutoSizeProvider : AutoSizeProvider
         bool useLayoutGroups = true,
         bool enableCache = true,
         int maxCacheSize = 1000,
-        Func<int, Vector2> customSizeCalculator = null,
+        Func<int, object, Vector2> customSizeCalculator = null,
         bool forceRebuild = false
     );
 }
@@ -56,7 +62,7 @@ public class LayoutAutoSizeProvider : AutoSizeProvider
 ### 基本用法
 
 ```csharp
-// 1. 创建尺寸提供器
+// 1. 创建尺寸提供器（现在继承自BaseVariableSizeAdapter）
 var sizeProvider = new LayoutAutoSizeProvider(
     template: messageTemplate,
     countGetter: () => messages.Count,
@@ -81,6 +87,42 @@ var adapter = new StandardVariableSizeAdapter(
 
 // 3. 初始化 ScrollView
 scrollView.Initialize(adapter);
+```
+
+### 直接继承BaseVariableSizeAdapter
+
+```csharp
+public class CustomSizeAdapter : BaseVariableSizeAdapter
+{
+    private readonly List<CustomData> _dataList;
+    
+    public CustomSizeAdapter(RectTransform prefab, List<CustomData> dataList)
+        : base(prefab, prefab, () => dataList.Count)
+    {
+        _dataList = dataList;
+    }
+    
+    protected override int GetItemCount() => _dataList.Count;
+    
+    protected override Vector2 GetBaseSize(int index, Vector2 viewportSize, IScrollLayout layout)
+    {
+        // 返回基础尺寸
+        return new Vector2(200, 100); // 固定尺寸
+    }
+    
+    protected override object GetDataForLayout(int index)
+    {
+        return _dataList[index];
+    }
+    
+    protected override void OnBind(int index, RectTransform cell)
+    {
+        // 绑定数据到cell
+        var data = _dataList[index];
+        var text = cell.GetComponent<TextMeshProUGUI>();
+        text.text = data.Name;
+    }
+}
 ```
 
 ### 高级用法

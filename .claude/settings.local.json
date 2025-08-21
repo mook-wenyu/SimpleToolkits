@@ -12,7 +12,10 @@
       "Bash(claude mcp add-json:*)",
       "Bash(claude mcp add:*)",
       "Bash(claude mcp list:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": [],

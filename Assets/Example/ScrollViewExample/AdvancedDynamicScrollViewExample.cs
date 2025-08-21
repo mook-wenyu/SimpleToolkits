@@ -109,7 +109,7 @@ namespace SimpleToolkits.ScrollViewExample
 
         private void InitializeComponents()
         {
-            // 使用通用 LayoutAutoSizeProvider + templateBinder（仅做测量绑定）
+            // 使用通用 LayoutAutoSizeProvider + templateBinder（继承自BaseVariableSizeAdapter）
             _sizeProvider = new LayoutAutoSizeProvider(
                 template: _messageTemplate,
                 countGetter: () => _filteredMessages.Count,

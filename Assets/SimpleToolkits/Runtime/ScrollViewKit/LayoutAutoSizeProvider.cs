@@ -9,7 +9,7 @@ namespace SimpleToolkits
     /// 布局自动尺寸提供器 - 具体实现
     /// 支持基于Unity布局组件的自动尺寸计算，适用于大多数场景
     /// </summary>
-    public class LayoutAutoSizeProvider : AutoSizeProvider
+    public class LayoutAutoSizeProvider : BaseVariableSizeAdapter
     {
         #region 字段和属性
         private Func<int> _countGetter;
@@ -51,7 +51,7 @@ namespace SimpleToolkits
             int maxCacheSize = 1000,
             Func<int, object, Vector2> customSizeCalculator = null,
             bool forceRebuild = false)
-            : base(template, fixedSize, minSize, maxSize, useLayoutGroups, forceRebuild)
+            : base(template, template, countGetter, fixedSize, minSize, maxSize, useLayoutGroups, forceRebuild)
         {
             _countGetter = countGetter ?? throw new ArgumentNullException(nameof(countGetter));
             _dataGetter = dataGetter ?? throw new ArgumentNullException(nameof(dataGetter));
@@ -77,7 +77,7 @@ namespace SimpleToolkits
             int maxCacheSize = 1000,
             Func<int, object, Vector2> customSizeCalculator = null,
             bool forceRebuild = false)
-            : base(template, fixedWidth, minHeight, maxHeight, useLayoutGroups, forceRebuild)
+            : base(template, template, countGetter, new Vector2(fixedWidth, -1f), new Vector2(fixedWidth, minHeight), new Vector2(fixedWidth, maxHeight), useLayoutGroups, forceRebuild)
         {
             _countGetter = countGetter ?? throw new ArgumentNullException(nameof(countGetter));
             _dataGetter = dataGetter ?? throw new ArgumentNullException(nameof(dataGetter));

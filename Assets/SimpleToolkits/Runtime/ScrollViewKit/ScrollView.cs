@@ -12,12 +12,12 @@ namespace SimpleToolkits
     /// - 兼容 LayoutElement/ContentSizeFitter（单元格内部自行决定布局）
     /// - 建议固定主轴尺寸以获得最佳性能，可选尺寸提供器支持变高/变宽
     /// - 协程基于 UniTask
-    /// - 可自动兼容 Unity 的 Vertical/Horizontal/GridLayoutGroup（仅读取配置，运行时禁用以保证性能）
     ///
-    /// 用法（伪）：
+    /// 用法：
     /// 1) 将本组件挂到包含 ScrollRect 的同级 GameObject
-    /// 2) 调用 Initialize(adapter, layout) 或 Initialize(adapter)（自动桥接 LayoutGroup）
-    /// 3) 调用 Refresh() 或 SetItemCount() 刷新数据
+    /// 2) 在 Content 上添加布局组件（VerticalLayout、HorizontalLayout 或 GridLayout）
+    /// 3) 调用 Initialize(adapter) 初始化
+    /// 4) 调用 Refresh() 或 SetItemCount() 刷新数据
     /// </summary>
     [RequireComponent(typeof(ScrollRect))]
     public sealed class ScrollView : MonoBehaviour
@@ -55,7 +55,7 @@ namespace SimpleToolkits
         /// <summary>
         /// 初始化滚动视图。必须在使用前调用一次。
         /// </summary>
-        public void Initialize(IScrollAdapter adapter, IScrollLayout layout)
+        public void Initialize(IScrollAdapter adapter)
         {
             // 参数检查
             if (_scrollRect == null)
@@ -77,16 +77,26 @@ namespace SimpleToolkits
             }
 
             _adapter = adapter;
-            _layout = layout;
+            _layout = _content.GetComponent<IScrollLayout>();
+            if (_layout == null)
+            {
+                Debug.LogError("[ScrollView] Content 上未找到 IScrollLayout 组件，请添加 VerticalLayout、HorizontalLayout 或 GridLayout 组件");
+                return;
+            }
 
-            // 如果 Content 上仍有启用的 LayoutGroup，则禁用以避免与手动定位冲突
+            // 如果 Content 上仍有启用的 Unity LayoutGroup，则禁用以避免与手动定位冲突
             var hasAnyLayoutGroup = _content.GetComponent<HorizontalLayoutGroup>() != null
                                     || _content.GetComponent<VerticalLayoutGroup>() != null
                                     || _content.GetComponent<GridLayoutGroup>() != null;
             if (hasAnyLayoutGroup)
             {
-                Debug.LogWarning("[ScrollView] 检测到 Content 上存在 LayoutGroup，虚拟化运行期将禁用这些组件以避免冲突。");
-                ScrollLayoutFactory.DisableAllLayoutGroups(_content);
+                Debug.LogWarning("[ScrollView] 检测到 Content 上存在 Unity LayoutGroup，虚拟化运行期将禁用这些组件以避免冲突。");
+                var v = _content.GetComponent<VerticalLayoutGroup>();
+                if (v != null) v.enabled = false;
+                var h = _content.GetComponent<HorizontalLayoutGroup>();
+                if (h != null) h.enabled = false;
+                var g = _content.GetComponent<GridLayoutGroup>();
+                if (g != null) g.enabled = false;
             }
 
             // ScrollRect 方向设置
@@ -116,124 +126,62 @@ namespace SimpleToolkits
             Refresh(true);
         }
 
-        /// <summary>
-        /// 初始化滚动视图（自动桥接 Unity 的 LayoutGroup）。
-        /// - 会尝试从 Content 上读取 Vertical/Horizontal/GridLayoutGroup 配置生成 IScrollLayout
-        /// - 读取完成后会禁用原生 LayoutGroup 以避免冲突
-        /// </summary>
-        /// <param name="adapter">数据适配器</param>
-        /// <param name="isVerticalForGrid">当 Content 存在 GridLayoutGroup 时指定滚动方向（true=纵向滚动）</param>
-        public void Initialize(IScrollAdapter adapter, bool isVerticalForGrid = true)
-        {
-            if (_scrollRect == null)
-            {
-                _scrollRect = GetComponentInChildren<ScrollRect>(true);
-            }
-            if (_scrollRect == null)
-            {
-                Debug.LogError("[ScrollView] 缺少 ScrollRect 组件");
-                return;
-            }
 
-            _content = _content != null ? _content : _scrollRect.content;
-            if (_content == null)
-            {
-                Debug.LogError("[ScrollView] 缺少 Content 容器(RectTransform)");
-                return;
-            }
-
-            // 从 LayoutGroup 生成布局策略
-            var bridgedLayout = ScrollLayoutFactory.FromLayoutGroup(_content, isVerticalForGrid, disableOriginalLayoutGroup: true);
-            if (bridgedLayout == null)
-            {
-                Debug.LogWarning("[ScrollView] 未在 Content 上检测到可用的 LayoutGroup，需手动提供 IScrollLayout。");
-                return;
-            }
-
-            Initialize(adapter, bridgedLayout);
-        }
-
-        //================ 便捷初始化重载 ================
+        //================ 便捷初始化方法 ================
         /// <summary>
         /// 便捷初始化（固定数量）。
         /// </summary>
-        public void Initialize(RectTransform prefab, int count, Action<int, RectTransform> bind, IScrollLayout layout)
+        public void Initialize(RectTransform prefab, int count, Action<int, RectTransform> bind)
         {
-            if (prefab == null || bind == null || layout == null)
+            if (prefab == null || bind == null)
             {
                 Debug.LogError("[ScrollView] Initialize 参数无效");
                 return;
             }
-            Initialize(new SimpleAdapter(prefab, () => count, bind), layout);
+            Initialize(new SimpleAdapter(prefab, () => count, bind));
         }
 
         /// <summary>
         /// 便捷初始化（动态数量委托）。
         /// </summary>
-        public void Initialize(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind, IScrollLayout layout)
+        public void Initialize(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind)
         {
-            if (prefab == null || countGetter == null || bind == null || layout == null)
+            if (prefab == null || countGetter == null || bind == null)
             {
                 Debug.LogError("[ScrollView] Initialize 参数无效");
                 return;
             }
-            Initialize(new SimpleAdapter(prefab, countGetter, bind), layout);
+            Initialize(new SimpleAdapter(prefab, countGetter, bind));
         }
 
-        /// <summary>
-        /// 便捷初始化（固定数量，自动桥接 LayoutGroup）。
-        /// </summary>
-        public void Initialize(RectTransform prefab, int count, Action<int, RectTransform> bind, bool isVerticalForGrid = true)
-        {
-            var layout = ScrollLayoutFactory.FromLayoutGroup(_content != null ? _content : (_scrollRect != null ? _scrollRect.content : null), isVerticalForGrid, disableOriginalLayoutGroup: true);
-            if (layout == null)
-            {
-                Debug.LogError("[ScrollView] 自动桥接失败：未发现可用的 LayoutGroup，请手动提供 IScrollLayout");
-                return;
-            }
-            Initialize(prefab, count, bind, layout);
-        }
 
-        /// <summary>
-        /// 便捷初始化（动态数量，自动桥接 LayoutGroup）。
-        /// </summary>
-        public void Initialize(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind, bool isVerticalForGrid = true)
-        {
-            var layout = ScrollLayoutFactory.FromLayoutGroup(_content != null ? _content : (_scrollRect != null ? _scrollRect.content : null), isVerticalForGrid, disableOriginalLayoutGroup: true);
-            if (layout == null)
-            {
-                Debug.LogError("[ScrollView] 自动桥接失败：未发现可用的 LayoutGroup，请手动提供 IScrollLayout");
-                return;
-            }
-            Initialize(prefab, countGetter, bind, layout);
-        }
 
         /// <summary>
         /// 便捷初始化（变尺寸：固定数量）。仅在单列/单行布局有效。
         /// </summary>
         public void InitializeVariable(RectTransform prefab, int count, Action<int, RectTransform> bind,
-            Func<int, Vector2, IScrollLayout, Vector2> sizeGetter, IScrollLayout layout, Vector2 fallbackSize = default)
+            Func<int, Vector2, IScrollLayout, Vector2> sizeGetter, Vector2 fallbackSize = default)
         {
-            if (prefab == null || bind == null || layout == null || sizeGetter == null)
+            if (prefab == null || bind == null || sizeGetter == null)
             {
                 Debug.LogError("[ScrollView] InitializeVariable 参数无效");
                 return;
             }
-            Initialize(new SimpleVarAdapter(prefab, () => count, bind, sizeGetter, fallbackSize), layout);
+            Initialize(new SimpleVarAdapter(prefab, () => count, bind, sizeGetter, fallbackSize));
         }
 
         /// <summary>
         /// 便捷初始化（变尺寸：动态数量）。仅在单列/单行布局有效。
         /// </summary>
         public void InitializeVariable(RectTransform prefab, Func<int> countGetter, Action<int, RectTransform> bind,
-            Func<int, Vector2, IScrollLayout, Vector2> sizeGetter, IScrollLayout layout, Vector2 fallbackSize = default)
+            Func<int, Vector2, IScrollLayout, Vector2> sizeGetter, Vector2 fallbackSize = default)
         {
-            if (prefab == null || countGetter == null || bind == null || layout == null || sizeGetter == null)
+            if (prefab == null || countGetter == null || bind == null || sizeGetter == null)
             {
                 Debug.LogError("[ScrollView] InitializeVariable 参数无效");
                 return;
             }
-            Initialize(new SimpleVarAdapter(prefab, countGetter, bind, sizeGetter, fallbackSize), layout);
+            Initialize(new SimpleVarAdapter(prefab, countGetter, bind, sizeGetter, fallbackSize));
         }
 
         /// <summary>
@@ -319,82 +267,11 @@ namespace SimpleToolkits
             _controller.Rebuild(!keepPosition);
         }
 
-        /// <summary>
-        /// 重新初始化（热重建）：更换适配器或布局；可选择保留当前滚动位置。
-        /// </summary>
-        public void Reinitialize(IScrollAdapter adapter, IScrollLayout layout, bool keepPosition = true)
-        {
-            if (_scrollRect == null)
-            {
-                _scrollRect = GetComponentInChildren<ScrollRect>(true);
-            }
-            if (_scrollRect == null)
-            {
-                Debug.LogError("[ScrollView] 缺少 ScrollRect 组件");
-                return;
-            }
-
-            _content = _content != null ? _content : _scrollRect.content;
-            if (_content == null)
-            {
-                Debug.LogError("[ScrollView] 缺少 Content 容器(RectTransform)");
-                return;
-            }
-
-            float norm = 0f;
-            if (_initialized && _controller != null && keepPosition)
-            {
-                norm = _controller.GetNormalizedPosition();
-                _scrollRect.onValueChanged.RemoveListener(OnScrollValueChanged);
-                _controller.Dispose();
-                _controller = null;
-            }
-
-            _adapter = adapter;
-            _layout = layout;
-
-            if (_layout == null || _adapter == null)
-            {
-                Debug.LogError("[ScrollView] Reinitialize 参数无效");
-                return;
-            }
-
-            // ScrollRect 方向设置
-            _scrollRect.horizontal = !_layout.IsVertical;
-            _scrollRect.vertical = _layout.IsVertical;
-            _scrollRect.movementType = ScrollRect.MovementType.Clamped;
-
-            _controller = new Internal.ScrollController(
-                _scrollRect,
-                _content,
-                _adapter,
-                _layout,
-                (first, last) =>
-                {
-                    _visibleFirst = first;
-                    _visibleLast = last;
-                    OnVisibleRangeChanged?.Invoke(first, last);
-                });
-
-            _scrollRect.onValueChanged.AddListener(OnScrollValueChanged);
-            _initialized = true;
-
-            if (keepPosition)
-            {
-                _controller.Rebuild(resetPosition: false);
-                _controller.SetNormalizedPosition(norm);
-                _controller.ForceUpdate();
-            }
-            else
-            {
-                Refresh(true);
-            }
-        }
 
         /// <summary>
-        /// 跳转到起始位置（顶部/最左）。
+        /// 滚动到起始位置（顶部/最左）。
         /// </summary>
-        public void JumpToStart()
+        public void ScrollToTop()
         {
             if (!_initialized) return;
             _controller.SetNormalizedPosition(_layout.IsVertical ? 1f : 0f);
@@ -402,9 +279,9 @@ namespace SimpleToolkits
         }
 
         /// <summary>
-        /// 跳转到末尾位置（底部/最右）。
+        /// 滚动到末尾位置（底部/最右）。
         /// </summary>
-        public void JumpToEnd()
+        public void ScrollToBottom()
         {
             if (!_initialized) return;
             _controller.SetNormalizedPosition(_layout.IsVertical ? 0f : 1f);
@@ -475,7 +352,7 @@ namespace SimpleToolkits
             _initialized = false;
         }
 
-        //================ 内部轻量适配器 ================
+        //================ 内部适配器类 ================
         /// <summary>
         /// 简单适配器：统一尺寸。
         /// </summary>

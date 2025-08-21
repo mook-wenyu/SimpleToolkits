@@ -23,20 +23,22 @@ namespace SimpleToolkits
     }
 
     /// <summary>
-    /// 可选：变高/变宽虚拟化适配器。
-    /// 当实现该接口时，滚动器将按每项主轴尺寸进行虚拟化（前缀和+二分查找）。
+    /// 变尺寸适配器接口：提供动态尺寸计算功能。
+    /// 当适配器实现此接口时，滚动器将按每项主轴尺寸进行虚拟化（前缀和+二分查找）。
     /// 注意：出于性能考虑，主轴尺寸应快速可得，且在刷新周期内尽量稳定。
     /// </summary>
     public interface IVariableSizeAdapter
     {
         /// <summary>
-        /// 返回指定项在当前布局下的尺寸。
-        /// 要求：返回值中的主轴尺寸用于虚拟化累计，跨轴尺寸通常由布局控制或自身决定。
+        /// 计算指定索引项的尺寸（返回 sizeDelta）。
         /// </summary>
-        /// <param name="index">数据索引</param>
-        /// <param name="viewportSize">视口尺寸（用于自适应）</param>
-        /// <param name="layout">当前布局</param>
-        /// <returns>该项的尺寸（RectTransform.sizeDelta 语义）</returns>
+        /// <param name="index">数据索引（0-based）。</param>
+        /// <param name="viewportSize">当前视口大小（像素）。
+        /// 用于在启用自动换行或跨轴受限时确定可用测量宽/高。例如纵向列表中文本换行需用到可用宽度。</param>
+        /// <param name="layout">当前使用的布局策略（如 VerticalLayout/HorizontalLayout）。
+        /// 可通过其属性判断主轴方向、间距、内边距以及是否由布局控制跨轴尺寸。</param>
+        /// <returns>返回该项在当前条件下的 <see cref="Vector2"/> 尺寸（sizeDelta）。
+        /// 应确保分量为正值；若实现返回非法值，框架将回退到预制体测量值。</returns>
         Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
     }
 

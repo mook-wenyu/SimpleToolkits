@@ -393,24 +393,30 @@ namespace SimpleToolkits.Internal
             // - 如果非拉伸，则 sizeDelta 表示绝对尺寸
             var sd = content.sizeDelta;
 
+            // 需要父级（视口）尺寸来计算拉伸时的差值
+            var parentRT = content.parent as RectTransform;
+            var parentSize = parentRT != null ? parentRT.rect.size : Vector2.zero;
+
             // 水平轴处理
             if (Mathf.Approximately(content.anchorMin.x, 0f) && Mathf.Approximately(content.anchorMax.x, 1f))
             {
-                sd.x = 0f; // 宽度跟随视口
+                // 拉伸：sizeDelta.x 为与父级宽度的差值，使内容可超出视口
+                sd.x = size.x - parentSize.x;
             }
             else
             {
-                sd.x = size.x; // 绝对宽度
+                sd.x = size.x; // 非拉伸：绝对宽度
             }
 
             // 垂直轴处理
             if (Mathf.Approximately(content.anchorMin.y, 0f) && Mathf.Approximately(content.anchorMax.y, 1f))
             {
-                sd.y = 0f; // 高度跟随父级（通常不拉伸此轴）
+                // 拉伸：sizeDelta.y 为与父级高度的差值
+                sd.y = size.y - parentSize.y;
             }
             else
             {
-                sd.y = size.y; // 绝对高度
+                sd.y = size.y; // 非拉伸：绝对高度
             }
 
             content.sizeDelta = sd;

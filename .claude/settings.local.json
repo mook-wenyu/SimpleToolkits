@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__UnityMCP__manage_gameobject",
+      "mcp__UnityMCP__manage_asset",
+      "mcp__UnityMCP__manage_script",
+      "mcp__UnityMCP__manage_scene",
+      "mcp__UnityMCP__read_console",
+      "mcp__UnityMCP__manage_editor",
+      "Bash(start:*)",
+      "Bash(claude mcp remove:*)",
+      "Bash(claude mcp add-json:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp list:*)",
+      "Bash(find:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "D:\\Py\\RepoMapper"
+    ]
+  }
+}

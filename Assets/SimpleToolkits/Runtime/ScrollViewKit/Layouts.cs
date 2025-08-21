@@ -5,7 +5,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 纵向列表布局：从上到下，x 方向填充为 0。
     /// </summary>
-    public class VerticalLayout : Component, IScrollLayout
+    public class VerticalLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]
@@ -105,7 +105,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 横向列表布局：从左到右，y 方向填充为 0。
     /// </summary>
-    public class HorizontalLayout : Component, IScrollLayout
+    public class HorizontalLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]
@@ -197,7 +197,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 网格布局：按 ConstraintCount 进行换行/换列。IsVertical=true 表示纵向滚动（从上到下换行），false 表示横向滚动（从左到右换列）。
     /// </summary>
-    public class GridLayout : Component, IScrollLayout
+    public class GridLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]

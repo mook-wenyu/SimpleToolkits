@@ -116,19 +116,11 @@ namespace SimpleToolkits.ScrollViewExample
             var content = _scrollView.GetComponentInChildren<ScrollRect>()?.content;
             if (content != null)
             {
-                // 检查是否已有布局组件，如果没有则创建
+                // 检查是否已有布局组件，如果没有则报错并返回
                 if (!content.gameObject.TryGetComponent<IScrollLayout>(out var layout))
                 {
-                    layout = content.gameObject.AddComponent<VerticalLayout>();
-                    var verticalLayout = layout as VerticalLayout;
-                    if (verticalLayout != null)
-                    {
-                        verticalLayout.spacing = 4f;
-                        verticalLayout.padding = new RectOffset(16, 16, 16, 16);
-                        verticalLayout.controlChildWidth = true;
-                        verticalLayout.controlChildHeight = false;
-                        verticalLayout.reverse = false;
-                    }
+                    Debug.LogError("无法找到 IScrollLayout 组件！请在 Content 对象上手动添加布局组件（如 VerticalLayout、HorizontalLayout 或 GridLayout）。", this);
+                    return;
                 }
             }
             else

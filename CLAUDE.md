@@ -137,43 +137,84 @@ public interface IVariableSizeAdapter
 }
 ```
 
-### AutoSizeProvider 系统
+### StandardVariableSizeAdapter 系统
 
-- **AutoSizeProvider**: 抽象基类，提供基于 Unity 布局组件的自动尺寸计算
-- **LayoutAutoSizeProvider**: 具体实现，支持缓存机制和性能优化
-- **特点**: 高性能、易用性、灵活性、支持多种布局场景
+- **StandardVariableSizeAdapter**: 增强的标准变尺寸适配器，合并了原 AutoSizeProvider 功能
+- **BaseVariableSizeAdapter**: 基础变尺寸适配器，提供核心功能和智能尺寸计算
+- **特点**: 高性能、智能布局感知、支持固定和自适应尺寸参数、适用于各种布局场景
+
+### 智能尺寸计算
+
+适配器根据 IScrollLayout 布局模式自动优化尺寸计算：
+
+- **纵向布局**：通常固定宽度，高度自适应
+- **横向布局**：通常固定高度，宽度自适应  
+- **网格布局**：支持固定宽高或按约束计算
 
 ### 使用模式
 
 ```csharp
-// 1. 创建尺寸提供器
-var sizeProvider = new LayoutAutoSizeProvider(
-    template: messageTemplate,
-    countGetter: () => messages.Count,
-    dataGetter: index => messages[index],
-    templateBinder: (rt, data) => {
-        // 绑定数据到模板
-    }
-);
-
-// 2. 创建适配器
-var adapter = new StandardVariableSizeAdapter(
+// 1. 纵向布局：固定宽度，自适应高度
+var adapter = StandardVariableSizeAdapter.CreateForVertical(
     prefab: messageTemplate,
     countGetter: () => messages.Count,
+    dataGetter: index => messages[index],
     binder: messageBinder,
-    sizeProvider: sizeProvider
+    templateBinder: (rt, data) => {
+        // 绑定数据到模板
+    },
+    fixedWidth: 300f,
+    minHeight: 60f,
+    maxHeight: 300f
 );
 
-// 3. 初始化 ScrollView
+// 2. 横向布局：固定高度，自适应宽度
+var adapter = StandardVariableSizeAdapter.CreateForHorizontal(
+    prefab: messageTemplate,
+    countGetter: () => messages.Count,
+    dataGetter: index => messages[index],
+    binder: messageBinder,
+    templateBinder: (rt, data) => {
+        // 绑定数据到模板
+    },
+    fixedHeight: 300f,
+    minWidth: 100f,
+    maxWidth: 500f
+);
+
+// 3. 网格布局：固定宽高
+var adapter = StandardVariableSizeAdapter.CreateForGrid(
+    prefab: itemTemplate,
+    countGetter: () => items.Count,
+    dataGetter: index => items[index],
+    binder: itemBinder,
+    templateBinder: (rt, data) => {
+        // 绑定数据到模板
+    },
+    fixedWidth: 100f,
+    fixedHeight: 100f
+);
+
+// 4. 初始化 ScrollView
 scrollView.Initialize(adapter);
 ```
 
+### 参数说明
+
+- **fixedWidth/fixedHeight**: 固定尺寸（≤0 表示自适应，>0 表示固定）
+- **minWidth/minHeight**: 最小尺寸限制
+- **maxWidth/maxHeight**: 最大尺寸限制
+- **enableCache**: 是否启用尺寸缓存
+- **maxCacheSize**: 最大缓存数量
+
 ### 性能优化
 
+- 智能尺寸计算，根据布局模式自动优化
 - 缓存机制避免重复计算
 - 支持预热缓存提高初始性能
 - 智能布局重建减少性能开销
 - 对象池管理提高内存效率
+- 支持自定义尺寸计算器
 
 ## Dependencies
 

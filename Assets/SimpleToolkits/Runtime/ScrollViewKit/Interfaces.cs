@@ -33,12 +33,9 @@ namespace SimpleToolkits
         /// 计算指定索引项的尺寸（返回 sizeDelta）。
         /// </summary>
         /// <param name="index">数据索引（0-based）。</param>
-        /// <param name="viewportSize">当前视口大小（像素）。
-        /// 用于在启用自动换行或跨轴受限时确定可用测量宽/高。例如纵向列表中文本换行需用到可用宽度。</param>
-        /// <param name="layout">当前使用的布局策略（如 VerticalLayout/HorizontalLayout）。
-        /// 可通过其属性判断主轴方向、间距、内边距以及是否由布局控制跨轴尺寸。</param>
-        /// <returns>返回该项在当前条件下的 <see cref="Vector2"/> 尺寸（sizeDelta）。
-        /// 应确保分量为正值；若实现返回非法值，框架将回退到预制体测量值。</returns>
+        /// <param name="viewportSize">当前视口大小（像素）。</param>
+        /// <param name="layout">当前使用的布局策略。</param>
+        /// <returns>返回该项在当前条件下的尺寸（sizeDelta）。</returns>
         Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
     }
 
@@ -78,13 +75,7 @@ namespace SimpleToolkits
         /// <summary>根据滚动位置与视口尺寸，计算应显示的索引范围（闭区间）。</summary>
         void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last);
 
-        /// <summary>
-        /// 返回指定索引在 Content 下的 anchoredPosition（左上为原点）。
-        /// 说明：
-        /// - 本框架保持 ScrollRect 归一化语义不变（Vertical: 1=顶部,0=底部；Horizontal: 0=左,1=右）。
-        /// - 当 Reverse=true 时，仅对索引进行镜像映射：viewIndex = itemCount-1-index。
-        /// - 定位应基于数学镜像计算，不依赖 contentSize 反推数量，以保证鲁棒性。
-        /// </summary>
+        /// <summary>返回指定索引在 Content 下的 anchoredPosition（左上为原点）。</summary>
         Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize);
     }
 

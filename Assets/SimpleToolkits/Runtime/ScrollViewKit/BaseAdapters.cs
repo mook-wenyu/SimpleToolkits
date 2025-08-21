@@ -70,25 +70,15 @@ namespace SimpleToolkits
         
         // 性能优化：避免频繁重建布局
         private int _lastRebuildFrame = -1;
-        private Vector2 _lastTemplateSize;
         private bool _isInitialized = false;
         #endregion
 
         #region 构造函数
         /// <summary>
-        /// 完整构造函数
+        /// 基础构造函数
         /// </summary>
-        /// <param name="prefab">预制体RectTransform</param>
-        /// <param name="template">模板RectTransform（用于尺寸计算）</param>
-        /// <param name="countGetter">数据数量获取器</param>
-        /// <param name="fixedSize">固定尺寸（主轴尺寸由布局控制时设置为-1）</param>
-        /// <param name="minSize">最小尺寸</param>
-        /// <param name="maxSize">最大尺寸</param>
-        /// <param name="useLayoutGroups">是否使用布局组件计算尺寸</param>
-        /// <param name="forceRebuild">是否强制重建布局</param>
         protected BaseVariableSizeAdapter(
             RectTransform prefab, 
-            RectTransform template, 
             Func<int> countGetter = null,
             Vector2 fixedSize = default,
             Vector2 minSize = default,
@@ -97,7 +87,7 @@ namespace SimpleToolkits
             bool forceRebuild = false)
             : base(prefab, countGetter)
         {
-            _template = template ?? throw new ArgumentNullException(nameof(template));
+            _template = prefab;
             _fixedSize = fixedSize;
             _minSize = minSize;
             _maxSize = maxSize;
@@ -105,35 +95,6 @@ namespace SimpleToolkits
             _forceRebuild = forceRebuild;
             
             InitializeCache();
-        }
-
-        /// <summary>
-        /// 简化构造函数 - 使用预制体作为模板
-        /// </summary>
-        protected BaseVariableSizeAdapter(
-            RectTransform prefab, 
-            Func<int> countGetter = null,
-            Vector2 fixedSize = default,
-            Vector2 minSize = default,
-            Vector2 maxSize = default,
-            bool useLayoutGroups = true,
-            bool forceRebuild = false)
-            : this(prefab, prefab, countGetter, fixedSize, minSize, maxSize, useLayoutGroups, forceRebuild)
-        {
-        }
-
-        /// <summary>
-        /// 简化构造函数 - 使用固定宽度和自适应高度
-        /// </summary>
-        protected BaseVariableSizeAdapter(
-            RectTransform prefab, 
-            float fixedWidth, 
-            float minHeight = 60f, 
-            float maxHeight = 300f,
-            bool useLayoutGroups = true,
-            bool forceRebuild = false)
-            : this(prefab, prefab, null, new Vector2(fixedWidth, -1f), new Vector2(fixedWidth, minHeight), new Vector2(fixedWidth, maxHeight), useLayoutGroups, forceRebuild)
-        {
         }
         #endregion
 
@@ -148,14 +109,8 @@ namespace SimpleToolkits
                 return GetFallbackSize(layout);
             }
 
-            var baseSize = GetBaseSize(index, viewportSize, layout);
-            var layoutSize = _useLayoutGroups ? GetLayoutSize(index, viewportSize, layout) : Vector2.zero;
-            
-            // 合并基础尺寸和布局尺寸
-            var finalSize = MergeSizes(baseSize, layoutSize, layout);
-            
-            // 应用尺寸限制
-            return ClampSize(finalSize, layout);
+            var size = GetItemSizeInternal(index, viewportSize, layout);
+            return ClampSize(size, layout);
         }
         #endregion
 
@@ -164,11 +119,6 @@ namespace SimpleToolkits
         /// 获取数据项总数
         /// </summary>
         protected abstract int GetItemCount();
-
-        /// <summary>
-        /// 获取基础尺寸（不包含布局计算的尺寸）
-        /// </summary>
-        protected abstract Vector2 GetBaseSize(int index, Vector2 viewportSize, IScrollLayout layout);
 
         /// <summary>
         /// 获取索引对应的数据，用于布局计算
@@ -192,30 +142,28 @@ namespace SimpleToolkits
         }
 
         /// <summary>
-        /// 合并基础尺寸和布局尺寸
+        /// 获取项目尺寸（内部实现）
         /// </summary>
-        protected virtual Vector2 MergeSizes(Vector2 baseSize, Vector2 layoutSize, IScrollLayout layout)
+        protected virtual Vector2 GetItemSizeInternal(int index, Vector2 viewportSize, IScrollLayout layout)
         {
-            var result = baseSize;
-            
-            if (layout.IsVertical)
+            if (!_useLayoutGroups || _template == null)
+                return _fixedSize;
+
+            try
             {
-                // 纵向布局：使用基础宽度，高度使用布局计算或基础值
-                if (layoutSize.y > 0)
-                    result.y = layoutSize.y;
-                else if (result.y < 0)
-                    result.y = _minSize.y;
+                // 性能优化：避免每帧都重建布局
+                if (ShouldRebuildLayout())
+                {
+                    RebuildLayout();
+                }
+
+                return CalculateLayoutSize(index, viewportSize, layout);
             }
-            else
+            catch (Exception e)
             {
-                // 横向布局：使用基础高度，宽度使用布局计算或基础值
-                if (layoutSize.x > 0)
-                    result.x = layoutSize.x;
-                else if (result.x < 0)
-                    result.x = _minSize.x;
+                Debug.LogWarning($"[BaseVariableSizeAdapter] 布局计算失败: {e.Message}");
+                return _fixedSize;
             }
-            
-            return result;
         }
 
         /// <summary>
@@ -238,39 +186,15 @@ namespace SimpleToolkits
         }
 
         /// <summary>
-        /// 获取布局计算的尺寸
-        /// </summary>
-        protected virtual Vector2 GetLayoutSize(int index, Vector2 viewportSize, IScrollLayout layout)
-        {
-            if (!_useLayoutGroups || _template == null)
-                return Vector2.zero;
-
-            try
-            {
-                // 性能优化：避免每帧都重建布局
-                if (ShouldRebuildLayout())
-                {
-                    RebuildLayout();
-                }
-
-                return CalculateLayoutSize(index, viewportSize, layout);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[BaseVariableSizeAdapter] 布局计算失败: {e.Message}");
-                return Vector2.zero;
-            }
-        }
-
-        /// <summary>
         /// 计算布局尺寸
+        /// 根据布局方向和固定尺寸参数智能计算单元格尺寸
         /// </summary>
         protected virtual Vector2 CalculateLayoutSize(int index, Vector2 viewportSize, IScrollLayout layout)
         {
             var data = GetDataForLayout(index);
             if (data == null)
-                return Vector2.zero;
-
+                return _fixedSize;
+            
             // 如果有LayoutElement，优先使用其配置的尺寸
             if (_layoutElementCache != null)
             {
@@ -278,17 +202,57 @@ namespace SimpleToolkits
                 if (layoutSize != Vector2.zero)
                     return layoutSize;
             }
-
+            
             // 如果有ContentSizeFitter，使用其首选尺寸
             if (_contentSizeFitterCache != null)
             {
                 var preferredSize = GetPreferredSize();
                 if (preferredSize != Vector2.zero)
-                    return preferredSize;
+                    return OptimizeSizeForLayout(preferredSize, layout, viewportSize);
             }
+            
+            // 使用模板的当前尺寸并进行布局优化
+            var templateSize = _template.rect.size;
+            return OptimizeSizeForLayout(templateSize, layout, viewportSize);
+        }
 
-            // 使用模板的当前尺寸
-            return _template.rect.size;
+        /// <summary>
+        /// 根据布局模式优化尺寸
+        /// </summary>
+        protected virtual Vector2 OptimizeSizeForLayout(Vector2 size, IScrollLayout layout, Vector2 viewportSize)
+        {
+            float finalWidth = _fixedSize.x > 0 ? _fixedSize.x : size.x;
+            float finalHeight = _fixedSize.y > 0 ? _fixedSize.y : size.y;
+            
+            // 应用最小/最大尺寸限制
+            finalWidth = Mathf.Clamp(finalWidth, _minSize.x, _maxSize.x > 0 ? _maxSize.x : float.MaxValue);
+            finalHeight = Mathf.Clamp(finalHeight, _minSize.y, _maxSize.y > 0 ? _maxSize.y : float.MaxValue);
+            
+            // 根据布局模式进行优化调整
+            if (layout.IsVertical)
+            {
+                // 纵向布局：通常宽度固定，高度自适应
+                // 如果没有设置固定宽度，但布局控制子对象宽度，则使用视口宽度
+                if (_fixedSize.x <= 0 && layout.ControlChildWidth)
+                {
+                    finalWidth = layout.ConstraintCount > 1 ? 
+                        (viewportSize.x - layout.Padding.left - layout.Padding.right - (layout.ConstraintCount - 1) * layout.Spacing.x) / layout.ConstraintCount :
+                        viewportSize.x - layout.Padding.left - layout.Padding.right;
+                }
+            }
+            else
+            {
+                // 横向布局：通常高度固定，宽度自适应
+                // 如果没有设置固定高度，但布局控制子对象高度，则使用视口高度
+                if (_fixedSize.y <= 0 && layout.ControlChildHeight)
+                {
+                    finalHeight = layout.ConstraintCount > 1 ?
+                        (viewportSize.y - layout.Padding.top - layout.Padding.bottom - (layout.ConstraintCount - 1) * layout.Spacing.y) / layout.ConstraintCount :
+                        viewportSize.y - layout.Padding.top - layout.Padding.bottom;
+                }
+            }
+            
+            return new Vector2(finalWidth, finalHeight);
         }
         #endregion
 
@@ -323,9 +287,6 @@ namespace SimpleToolkits
             {
                 // 强制重建布局
                 LayoutRebuilder.ForceRebuildLayoutImmediate(_template);
-                
-                // 缓存模板尺寸
-                _lastTemplateSize = _template.rect.size;
             }
             catch (Exception e)
             {
@@ -393,7 +354,6 @@ namespace SimpleToolkits
         public void ClearCache()
         {
             _lastRebuildFrame = -1;
-            _lastTemplateSize = Vector2.zero;
             _isInitialized = false;
         }
 

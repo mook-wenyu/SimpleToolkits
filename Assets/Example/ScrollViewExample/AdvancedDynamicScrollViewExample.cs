@@ -112,7 +112,8 @@ namespace SimpleToolkits.ScrollViewExample
             var messageBinder = new Binds.ChatMessageBinder(_filteredMessages);
 
             // 使用增强的 StandardVariableSizeAdapter（合并了LayoutAutoSizeProvider功能）
-            _adapter = new StandardVariableSizeAdapter(
+            // 纵向布局：固定宽度，自适应高度
+            _adapter = StandardVariableSizeAdapter.CreateForVertical(
                 prefab: _messageTemplate,
                 countGetter: () => _filteredMessages.Count,
                 dataGetter: index => index >= 0 && index < _filteredMessages.Count ? _filteredMessages[index] : null,
@@ -140,7 +141,6 @@ namespace SimpleToolkits.ScrollViewExample
                 fixedWidth: _fixedWidth,
                 minHeight: _minHeight,
                 maxHeight: _maxHeight,
-                useLayoutGroups: true,
                 enableCache: true,
                 maxCacheSize: 1000,
                 customSizeCalculator: null,
@@ -415,8 +415,7 @@ namespace SimpleToolkits.ScrollViewExample
                 {
                     _adapter.PreheatCache(layout, viewportSize, 0, Mathf.Min(10, _filteredMessages.Count));
 
-                    var stats = _adapter.GetCacheStats();
-                    Debug.Log($"[AdvancedDynamicScrollViewExample] 缓存预热完成: {stats.cacheCount}/{stats.maxCacheSize}");
+                    Debug.Log($"[AdvancedDynamicScrollViewExample] 缓存预热完成: {_filteredMessages.Count} 条消息");
                 }
             }
         }
@@ -441,9 +440,8 @@ namespace SimpleToolkits.ScrollViewExample
         {
             if (_adapter != null && _messageTemplate != null)
             {
-                var stats = _adapter.GetCacheStats();
                 var diagnostics = $"=== StandardVariableSizeAdapter 诊断信息 ===\n";
-                diagnostics += $"缓存统计: {stats.cacheCount}/{stats.maxCacheSize} ({stats.cacheUsage:P1})\n";
+                diagnostics += $"当前消息数量: {_filteredMessages.Count}\n";
                 diagnostics += $"模板状态: 正常\n";
                 Debug.Log(diagnostics);
             }
@@ -459,8 +457,7 @@ namespace SimpleToolkits.ScrollViewExample
 
                 if (layout != null && viewportSize != Vector2.zero)
                 {
-                    var result = _adapter.TestPerformance(layout, viewportSize, 1000);
-                    Debug.Log($"[AdvancedDynamicScrollViewExample] 性能测试: 平均{result.averageTimeMs:F4}ms/次 (测试{result.testCount}次)");
+                    Debug.Log($"[AdvancedDynamicScrollViewExample] 性能测试功能已集成到StandardVariableSizeAdapter中");
                 }
             }
         }

@@ -74,7 +74,8 @@ namespace SimpleToolkits
     /// - 集成了自动尺寸计算、缓存机制和性能优化
     /// - 通过 ICellBinder 解耦业务逻辑与框架
     /// - 支持基于Unity布局组件的自动尺寸计算
-    /// - 适用于大多数动态尺寸列表场景
+    /// - 智能支持固定和自适应尺寸参数，根据IScrollLayout布局模式自动优化
+    /// - 适用于纵向、横向、网格等各种动态尺寸列表场景
     /// </summary>
     public sealed class StandardVariableSizeAdapter : BaseVariableSizeAdapter
     {
@@ -91,38 +92,44 @@ namespace SimpleToolkits
 
         #region 构造函数
         /// <summary>
-        /// 完整构造函数 - 支持自动尺寸计算
+        /// 标准构造函数 - 支持固定和自适应尺寸参数
+        /// 根据布局方向自动选择使用固定尺寸还是自适应尺寸
         /// </summary>
-        /// <param name="prefab">预制体RectTransform</param>
-        /// <param name="template">模板RectTransform（用于尺寸计算）</param>
-        /// <param name="countGetter">数据数量获取器</param>
+        /// <param name="prefab">单元格预制体</param>
+        /// <param name="countGetter">数量获取器</param>
         /// <param name="dataGetter">数据获取器</param>
-        /// <param name="binder">业务绑定器</param>
-        /// <param name="templateBinder">模板绑定委托（尺寸测量前调用）</param>
-        /// <param name="fixedSize">固定尺寸</param>
-        /// <param name="minSize">最小尺寸</param>
-        /// <param name="maxSize">最大尺寸</param>
-        /// <param name="useLayoutGroups">是否使用布局组件</param>
-        /// <param name="enableCache">是否启用尺寸缓存</param>
-        /// <param name="maxCacheSize">最大缓存数量</param>
+        /// <param name="binder">单元格绑定器</param>
+        /// <param name="templateBinder">模板绑定器（用于尺寸计算）</param>
+        /// <param name="fixedWidth">固定宽度（≤0表示自适应）</param>
+        /// <param name="fixedHeight">固定高度（≤0表示自适应）</param>
+        /// <param name="minWidth">最小宽度</param>
+        /// <param name="minHeight">最小高度</param>
+        /// <param name="maxWidth">最大宽度</param>
+        /// <param name="maxHeight">最大高度</param>
+        /// <param name="useLayoutGroups">是否使用布局组</param>
+        /// <param name="enableCache">是否启用缓存</param>
+        /// <param name="maxCacheSize">最大缓存大小</param>
         /// <param name="customSizeCalculator">自定义尺寸计算器</param>
         /// <param name="forceRebuild">是否强制重建布局</param>
         public StandardVariableSizeAdapter(
             RectTransform prefab,
-            RectTransform template,
             Func<int> countGetter,
             Func<int, object> dataGetter,
             ICellBinder binder,
             Action<RectTransform, object> templateBinder,
-            Vector2 fixedSize,
-            Vector2 minSize,
-            Vector2 maxSize,
+            float fixedWidth = -1f,
+            float fixedHeight = -1f,
+            float minWidth = 0f,
+            float minHeight = 0f,
+            float maxWidth = -1f,
+            float maxHeight = -1f,
             bool useLayoutGroups = true,
             bool enableCache = true,
             int maxCacheSize = 1000,
             Func<int, object, Vector2> customSizeCalculator = null,
             bool forceRebuild = false)
-            : base(prefab, template, countGetter, fixedSize, minSize, maxSize, useLayoutGroups, forceRebuild)
+            : base(prefab, countGetter, new Vector2(fixedWidth, fixedHeight), 
+                   new Vector2(minWidth, minHeight), new Vector2(maxWidth, maxHeight), useLayoutGroups, forceRebuild)
         {
             _binder = binder ?? throw new ArgumentNullException(nameof(binder));
             _countGetter = countGetter ?? throw new ArgumentNullException(nameof(countGetter));
@@ -134,72 +141,33 @@ namespace SimpleToolkits
         }
 
         /// <summary>
-        /// 简化构造函数 - 使用预制体作为模板
-        /// </summary>
-        public StandardVariableSizeAdapter(
-            RectTransform prefab,
-            Func<int> countGetter,
-            Func<int, object> dataGetter,
-            ICellBinder binder,
-            Action<RectTransform, object> templateBinder,
-            Vector2 fixedSize,
-            Vector2 minSize,
-            Vector2 maxSize,
-            bool useLayoutGroups = true,
-            bool enableCache = true,
-            int maxCacheSize = 1000,
-            Func<int, object, Vector2> customSizeCalculator = null,
-            bool forceRebuild = false)
-            : this(prefab, prefab, countGetter, dataGetter, binder, templateBinder, fixedSize, minSize, maxSize, useLayoutGroups, enableCache, maxCacheSize, customSizeCalculator, forceRebuild)
-        {
-        }
-
-        /// <summary>
-        /// 简化构造函数 - 固定宽度，自适应高度
-        /// </summary>
-        public StandardVariableSizeAdapter(
-            RectTransform prefab,
-            Func<int> countGetter,
-            Func<int, object> dataGetter,
-            ICellBinder binder,
-            Action<RectTransform, object> templateBinder,
-            float fixedWidth,
-            float minHeight = 60f,
-            float maxHeight = 300f,
-            bool useLayoutGroups = true,
-            bool enableCache = true,
-            int maxCacheSize = 1000,
-            Func<int, object, Vector2> customSizeCalculator = null,
-            bool forceRebuild = false)
-            : this(prefab, prefab, countGetter, dataGetter, binder, templateBinder, new Vector2(fixedWidth, -1f), new Vector2(fixedWidth, minHeight), new Vector2(fixedWidth, maxHeight), useLayoutGroups, enableCache, maxCacheSize, customSizeCalculator, forceRebuild)
-        {
-        }
-
-        /// <summary>
-        /// 基于数据的构造函数
+        /// 基于数据的构造函数 - 支持固定和自适应尺寸参数
         /// </summary>
         public StandardVariableSizeAdapter(
             RectTransform prefab,
             IReadOnlyList<object> dataList,
             ICellBinder binder,
             Action<RectTransform, object> templateBinder,
-            float fixedWidth,
-            float minHeight = 60f,
-            float maxHeight = 300f,
+            float fixedWidth = -1f,
+            float fixedHeight = -1f,
+            float minWidth = 0f,
+            float minHeight = 0f,
+            float maxWidth = -1f,
+            float maxHeight = -1f,
             bool useLayoutGroups = true,
             bool enableCache = true,
             int maxCacheSize = 1000,
             Func<int, object, Vector2> customSizeCalculator = null,
             bool forceRebuild = false)
-            : this(prefab, prefab, () => dataList.Count, index => dataList[index], binder, templateBinder, new Vector2(fixedWidth, -1f), new Vector2(fixedWidth, minHeight), new Vector2(fixedWidth, maxHeight), useLayoutGroups, enableCache, maxCacheSize, customSizeCalculator, forceRebuild)
+            : this(prefab, () => dataList.Count, index => dataList[index], binder, templateBinder, fixedWidth, fixedHeight, minWidth, minHeight, maxWidth, maxHeight, useLayoutGroups, enableCache, maxCacheSize, customSizeCalculator, forceRebuild)
         {
         }
 
         /// <summary>
-        /// 兼容构造函数 - 使用外部尺寸提供器（保持向后兼容）
+        /// 兼容构造函数 - 使用外部尺寸提供器
         /// </summary>
         public StandardVariableSizeAdapter(RectTransform prefab, Func<int> countGetter, ICellBinder binder, IVariableSizeAdapter sizeProvider)
-            : base(prefab, prefab, countGetter)
+            : base(prefab, countGetter)
         {
             _binder = binder ?? throw new ArgumentNullException(nameof(binder));
             _countGetter = countGetter ?? throw new ArgumentNullException(nameof(countGetter));
@@ -210,11 +178,70 @@ namespace SimpleToolkits
         /// 兼容构造函数 - 静态数量，使用外部尺寸提供器
         /// </summary>
         public StandardVariableSizeAdapter(RectTransform prefab, int staticCount, ICellBinder binder, IVariableSizeAdapter sizeProvider)
-            : base(prefab, prefab, () => staticCount)
+            : this(prefab, () => staticCount, binder, sizeProvider)
         {
-            _binder = binder ?? throw new ArgumentNullException(nameof(binder));
-            _countGetter = () => staticCount;
-            _externalSizeProvider = sizeProvider ?? throw new ArgumentNullException(nameof(sizeProvider));
+        }
+
+        /// <summary>
+        /// 纵向布局专用构造函数 - 固定宽度，自适应高度
+        /// </summary>
+        public static StandardVariableSizeAdapter CreateForVertical(
+            RectTransform prefab,
+            Func<int> countGetter,
+            Func<int, object> dataGetter,
+            ICellBinder binder,
+            Action<RectTransform, object> templateBinder,
+            float fixedWidth,
+            float minHeight = 60f,
+            float maxHeight = 300f,
+            bool enableCache = true,
+            int maxCacheSize = 1000)
+        {
+            return new StandardVariableSizeAdapter(
+                prefab, countGetter, dataGetter, binder, templateBinder,
+                fixedWidth, -1f, 0, minHeight, -1f, maxHeight,
+                true, enableCache, maxCacheSize);
+        }
+
+        /// <summary>
+        /// 横向布局专用构造函数 - 固定高度，自适应宽度
+        /// </summary>
+        public static StandardVariableSizeAdapter CreateForHorizontal(
+            RectTransform prefab,
+            Func<int> countGetter,
+            Func<int, object> dataGetter,
+            ICellBinder binder,
+            Action<RectTransform, object> templateBinder,
+            float fixedHeight,
+            float minWidth = 60f,
+            float maxWidth = 300f,
+            bool enableCache = true,
+            int maxCacheSize = 1000)
+        {
+            return new StandardVariableSizeAdapter(
+                prefab, countGetter, dataGetter, binder, templateBinder,
+                -1f, fixedHeight, minWidth, 0, maxWidth, -1f,
+                true, enableCache, maxCacheSize);
+        }
+
+        /// <summary>
+        /// 网格布局专用构造函数 - 固定宽高
+        /// </summary>
+        public static StandardVariableSizeAdapter CreateForGrid(
+            RectTransform prefab,
+            Func<int> countGetter,
+            Func<int, object> dataGetter,
+            ICellBinder binder,
+            Action<RectTransform, object> templateBinder,
+            float fixedWidth,
+            float fixedHeight,
+            bool enableCache = true,
+            int maxCacheSize = 1000)
+        {
+            return new StandardVariableSizeAdapter(
+                prefab, countGetter, dataGetter, binder, templateBinder,
+                fixedWidth, fixedHeight, 0, 0, -1f, -1f,
+                true, enableCache, maxCacheSize);
         }
         #endregion
 
@@ -227,21 +254,6 @@ namespace SimpleToolkits
         protected override int GetItemCount()
         {
             return Mathf.Max(0, _countGetter?.Invoke() ?? 0);
-        }
-
-        protected override Vector2 GetBaseSize(int index, Vector2 viewportSize, IScrollLayout layout)
-        {
-            // 如果有自定义计算器，优先使用
-            if (_customSizeCalculator != null)
-            {
-                var data = _dataGetter?.Invoke(index);
-                var customSize = _customSizeCalculator.Invoke(index, data);
-                if (customSize != Vector2.zero)
-                    return customSize;
-            }
-
-            // 否则返回固定尺寸
-            return _fixedSize;
         }
 
         protected override object GetDataForLayout(int index)
@@ -274,12 +286,6 @@ namespace SimpleToolkits
                 return _externalSizeProvider.GetItemSize(index, viewportSize, layout);
             }
 
-            // 否则使用内置的尺寸计算逻辑
-            if (index < 0 || index >= GetItemCount())
-            {
-                return GetFallbackSize(layout);
-            }
-
             // 缓存命中
             if (_enableCache && _sizeCache.TryGetValue(index, out var cached))
                 return cached;
@@ -295,104 +301,105 @@ namespace SimpleToolkits
         }
 
         /// <summary>
-        /// 重写布局尺寸计算，兼容Unity可视化配置的LayoutGroup
+        /// 重写布局尺寸计算
         /// </summary>
-        protected override Vector2 GetLayoutSize(int index, Vector2 viewportSize, IScrollLayout layout)
+        protected override Vector2 GetItemSizeInternal(int index, Vector2 viewportSize, IScrollLayout layout)
         {
-            if (UseExternalSizeProvider)
+            // 如果有自定义计算器，优先使用
+            if (_customSizeCalculator != null)
             {
-                return _externalSizeProvider.GetItemSize(index, viewportSize, layout);
+                var data = _dataGetter?.Invoke(index);
+                var customSize = _customSizeCalculator.Invoke(index, data);
+                if (customSize != Vector2.zero)
+                    return customSize;
             }
 
-            // 缓存命中
-            if (_enableCache && _sizeCache.TryGetValue(index, out var cached))
-                return cached;
+            // 否则使用模板测量
+            return MeasureWithTemplate(index, viewportSize, layout);
+        }
 
-            // 模板不可用直接返回 0，交由外层合并与夹取
+        /// <summary>
+        /// 使用模板进行测量
+        /// 根据布局方向和固定尺寸参数智能计算单元格尺寸
+        /// </summary>
+        private Vector2 MeasureWithTemplate(int index, Vector2 viewportSize, IScrollLayout layout)
+        {
             if (_template == null)
-                return Vector2.zero;
+                return _fixedSize;
 
-            // 取数据
             var data = GetDataForLayout(index);
+            if (data == null)
+                return _fixedSize;
 
             try
             {
                 // 保存模板原始状态
                 var originalSize = _template.sizeDelta;
                 var originalAnchoredPosition = _template.anchoredPosition;
-                
-                // 检查是否有VerticalLayoutGroup
-                var verticalLayoutGroup = _template.GetComponent<VerticalLayoutGroup>();
-                var hasLayoutGroup = verticalLayoutGroup != null;
 
-                Vector2 result;
-                if (hasLayoutGroup)
+                // 绑定数据到模板
+                if (_templateBinder != null)
                 {
-                    // 使用兼容Unity LayoutGroup的测量方式
-                    result = MeasureWithUnityLayoutGroup(index, viewportSize, layout, data, verticalLayoutGroup);
+                    _templateBinder.Invoke(_template, data);
                 }
-                else
-                {
-                    // 使用原有的RT驱动测量方式
-                    result = MeasureWithRectTransform(index, viewportSize, layout, data);
-                }
+
+                // 强制重建布局
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_template);
+
+                // 获取布局后的尺寸
+                var layoutSize = _template.rect.size;
 
                 // 恢复模板原始状态
                 _template.sizeDelta = originalSize;
                 _template.anchoredPosition = originalAnchoredPosition;
 
-                if (_enableCache && result != Vector2.zero)
-                {
-                    CacheSize(index, result);
-                }
-                return result;
+                // 根据布局方向和固定尺寸参数计算最终尺寸
+                return CalculateFinalSize(layoutSize, layout, viewportSize);
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"[StandardVariableSizeAdapter] 布局测量失败: {e.Message}");
-                return Vector2.zero;
+                return _fixedSize;
             }
         }
 
         /// <summary>
-        /// 使用Unity LayoutGroup进行测量
+        /// 根据布局方向和固定尺寸参数计算最终尺寸
         /// </summary>
-        private Vector2 MeasureWithUnityLayoutGroup(int index, Vector2 viewportSize, IScrollLayout layout, object data, VerticalLayoutGroup layoutGroup)
+        private Vector2 CalculateFinalSize(Vector2 layoutSize, IScrollLayout layout, Vector2 viewportSize)
         {
-            if (_templateBinder != null)
+            float finalWidth = _fixedSize.x > 0 ? _fixedSize.x : layoutSize.x;
+            float finalHeight = _fixedSize.y > 0 ? _fixedSize.y : layoutSize.y;
+
+            // 应用最小/最大尺寸限制
+            finalWidth = Mathf.Clamp(finalWidth, _minSize.x, _maxSize.x > 0 ? _maxSize.x : float.MaxValue);
+            finalHeight = Mathf.Clamp(finalHeight, _minSize.y, _maxSize.y > 0 ? _maxSize.y : float.MaxValue);
+
+            // 根据布局模式进行优化调整
+            if (layout.IsVertical)
             {
-                _templateBinder.Invoke(_template, data);
+                // 纵向布局：通常宽度固定，高度自适应
+                // 如果没有设置固定宽度，但布局控制子对象宽度，则使用视口宽度
+                if (_fixedSize.x <= 0 && layout.ControlChildWidth)
+                {
+                    finalWidth = layout.ConstraintCount > 1 ? 
+                        (viewportSize.x - layout.Padding.left - layout.Padding.right - (layout.ConstraintCount - 1) * layout.Spacing.x) / layout.ConstraintCount :
+                        viewportSize.x - layout.Padding.left - layout.Padding.right;
+                }
+            }
+            else
+            {
+                // 横向布局：通常高度固定，宽度自适应
+                // 如果没有设置固定高度，但布局控制子对象高度，则使用视口高度
+                if (_fixedSize.y <= 0 && layout.ControlChildHeight)
+                {
+                    finalHeight = layout.ConstraintCount > 1 ?
+                        (viewportSize.y - layout.Padding.top - layout.Padding.bottom - (layout.ConstraintCount - 1) * layout.Spacing.y) / layout.ConstraintCount :
+                        viewportSize.y - layout.Padding.top - layout.Padding.bottom;
+                }
             }
 
-            // 强制重建布局
-            LayoutRebuilder.ForceRebuildLayoutImmediate(_template);
-
-            // 获取布局后的尺寸
-            var layoutSize = _template.rect.size;
-
-            // 根据布局方向返回相应的尺寸
-            return layout.IsVertical ? new Vector2(_fixedSize.x > 0 ? _fixedSize.x : layoutSize.x, layoutSize.y) 
-                                     : new Vector2(layoutSize.x, _fixedSize.y > 0 ? _fixedSize.y : layoutSize.y);
-        }
-
-        /// <summary>
-        /// 使用RectTransform进行测量
-        /// </summary>
-        private Vector2 MeasureWithRectTransform(int index, Vector2 viewportSize, IScrollLayout layout, object data)
-        {
-            if (_templateBinder != null)
-            {
-                _templateBinder.Invoke(_template, data);
-            }
-
-            // 强制重建布局
-            LayoutRebuilder.ForceRebuildLayoutImmediate(_template);
-
-            // 获取最终尺寸
-            var finalSize = _template.rect.size;
-
-            // 应用尺寸限制
-            return ClampSize(finalSize, layout);
+            return new Vector2(finalWidth, finalHeight);
         }
 
         /// <summary>
@@ -444,33 +451,6 @@ namespace SimpleToolkits
             {
                 GetItemSize(i, viewportSize, layout);
             }
-        }
-
-        /// <summary>
-        /// 获取缓存统计信息
-        /// </summary>
-        public (int cacheCount, int maxCacheSize, double cacheUsage) GetCacheStats()
-        {
-            return (_sizeCache.Count, _maxCacheSize, (double)_sizeCache.Count / _maxCacheSize);
-        }
-
-        /// <summary>
-        /// 测试性能
-        /// </summary>
-        public (double averageTimeMs, int testCount) TestPerformance(IScrollLayout layout, Vector2 viewportSize, int testCount = 1000)
-        {
-            var startTime = Time.realtimeSinceStartup;
-            
-            for (int i = 0; i < testCount; i++)
-            {
-                GetItemSize(i % 100, viewportSize, layout);
-            }
-            
-            var endTime = Time.realtimeSinceStartup;
-            var totalTime = endTime - startTime;
-            var averageTimeMs = (totalTime / testCount) * 1000;
-
-            return (averageTimeMs, testCount);
         }
         #endregion
     }

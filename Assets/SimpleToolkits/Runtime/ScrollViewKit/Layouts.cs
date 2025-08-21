@@ -6,7 +6,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 纵向列表布局：从上到下，x 方向填充为 0。
     /// </summary>
-    public sealed class VerticalLayout : MonoBehaviour, IScrollLayout
+    public class VerticalLayout : MonoBehaviour, IScrollLayout
     {
         public bool IsVertical => true;
         public float Spacing { get; private set; }
@@ -108,7 +108,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 横向列表布局：从左到右，y 方向填充为 0。
     /// </summary>
-    public sealed class HorizontalLayout : MonoBehaviour, IScrollLayout
+    public class HorizontalLayout : MonoBehaviour, IScrollLayout
     {
         public bool IsVertical => false;
         public float Spacing { get; private set; }
@@ -202,7 +202,7 @@ namespace SimpleToolkits
     /// <summary>
     /// 网格布局：按 ConstraintCount 进行换行/换列。IsVertical=true 表示纵向滚动（从上到下换行），false 表示横向滚动（从左到右换列）。
     /// </summary>
-    public sealed class GridLayout : MonoBehaviour, IScrollLayout
+    public class GridLayout : MonoBehaviour, IScrollLayout
     {
         public bool IsVertical { get; private set; }
         public Vector2 Spacing { get; private set; }

@@ -79,7 +79,7 @@ namespace SimpleToolkits.ScrollViewExample
 
             // 使用增强的 StandardVariableSizeAdapter（合并了LayoutAutoSizeProvider功能）
             // 横向列表：固定高度，自适应宽度
-            _adapter = new StandardVariableSizeAdapter(
+            _adapter = StandardVariableSizeAdapter.CreateForHorizontal(
                 prefab: _messageTemplate,
                 countGetter: () => _messages.Count,
                 dataGetter: index => index >= 0 && index < _messages.Count ? _messages[index] : null,
@@ -105,14 +105,11 @@ namespace SimpleToolkits.ScrollViewExample
                         if (contentTMP != null) contentTMP.text = s;
                     }
                 },
-                fixedSize: new Vector2(0, _fixedHeight), // 横向列表：x=0(自适应), y=固定高度
-                minSize: new Vector2(_minWidth, _fixedHeight), // 最小宽度，固定高度
-                maxSize: new Vector2(_maxWidth, _fixedHeight), // 最大宽度，固定高度
-                useLayoutGroups: true,
+                fixedHeight: _fixedHeight,
+                minWidth: _minWidth,
+                maxWidth: _maxWidth,
                 enableCache: true,
-                maxCacheSize: 1000,
-                customSizeCalculator: null,
-                forceRebuild: false
+                maxCacheSize: 1000
             );
 
             // 创建布局策略 - 横向列表
@@ -277,8 +274,7 @@ namespace SimpleToolkits.ScrollViewExample
                     _adapter.PreheatCache(layout, viewportSize, 0, _messages.Count);
 
                     // 输出缓存统计
-                    var stats = _adapter.GetCacheStats();
-                    Debug.Log($"[DynamicScrollViewExample] 缓存预热完成: {stats.cacheCount}/{stats.maxCacheSize} ({stats.cacheUsage:P1})");
+                    Debug.Log($"[DynamicScrollViewExample] 缓存预热完成: {_messages.Count} 条消息");
                 }
             }
         }
@@ -305,8 +301,7 @@ namespace SimpleToolkits.ScrollViewExample
         {
             if (_adapter != null)
             {
-                var stats = _adapter.GetCacheStats();
-                Debug.Log($"[DynamicScrollViewExample] 缓存统计: {stats.cacheCount}/{stats.maxCacheSize} ({stats.cacheUsage:P1})");
+                Debug.Log($"[DynamicScrollViewExample] 当前消息数量: {_messages.Count}");
             }
         }
 

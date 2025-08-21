@@ -6,7 +6,6 @@ namespace SimpleToolkits
     /// 横向列表布局：从左到右，y 方向填充为 0。
     /// 用于ScrollView的横向滚动布局。
     /// </summary>
-    [AddComponentMenu("Layout/Scroll Horizontal Layout")]
     public class ScrollHorizontalLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
@@ -29,10 +28,7 @@ namespace SimpleToolkits
         private void Awake()
         {
             // 初始化RectOffset，避免在构造函数中调用
-            if (padding == null)
-            {
-                padding = new RectOffset(0, 0, 0, 0);
-            }
+            padding ??= new RectOffset(0, 0, 0, 0);
         }
 
         #region IScrollLayout 接口实现

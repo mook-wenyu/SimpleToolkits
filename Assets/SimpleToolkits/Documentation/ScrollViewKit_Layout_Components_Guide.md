@@ -71,6 +71,8 @@ gridLayout.isVertical = true;
 - **位置**: Layout/
 - **特点**: 支持虚拟化、高性能、动态尺寸计算
 - **组件名**: ScrollVerticalLayout, ScrollHorizontalLayout, ScrollGridLayout
+- **文件结构**: 每个组件独立文件，符合Unity最佳实践
+- **现代C#特性**: 使用空合并赋值运算符(`??=`)进行安全的字段初始化
 
 ### Unity UI布局组件
 - **用途**: 用于普通UI布局
@@ -95,7 +97,23 @@ A: 在Inspector中可以直接配置所有参数，包括：
 - spacing: 间距
 - controlChildWidth/Height: 是否控制子对象尺寸
 - reverse: 是否反向排列
-- constraintCount: 约束数量（仅GridLayout）
+- constraintCount: 约束数量（仅ScrollGridLayout）
+
+### Q: 文件结构是怎样的？
+A: 遵循Unity最佳实践，每个MonoBehaviour类都有独立的文件：
+- ScrollVerticalLayout.cs
+- ScrollHorizontalLayout.cs  
+- ScrollGridLayout.cs
+
+### Q: 使用了什么现代C#特性？
+A: 使用了C# 8.0的空合并赋值运算符(`??=`)进行安全的字段初始化：
+```csharp
+private void Awake()
+{
+    // 现代C#语法：如果padding为null则赋值，否则保持原值
+    padding ??= new RectOffset(0, 0, 0);
+}
+```
 
 ## 验证修复
 

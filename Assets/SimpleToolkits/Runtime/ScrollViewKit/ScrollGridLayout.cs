@@ -6,7 +6,6 @@ namespace SimpleToolkits
     /// 网格布局：按 ConstraintCount 进行换行/换列。IsVertical=true 表示纵向滚动（从上到下换行），false 表示横向滚动（从左到右换列）。
     /// 用于ScrollView的网格滚动布局。
     /// </summary>
-    [AddComponentMenu("Layout/Scroll Grid Layout")]
     public class ScrollGridLayout : MonoBehaviour, IScrollLayout
     {
         [Header("通用布局设置")]
@@ -39,10 +38,7 @@ namespace SimpleToolkits
         private void Awake()
         {
             // 初始化RectOffset，避免在构造函数中调用
-            if (padding == null)
-            {
-                padding = new RectOffset(0, 0, 0, 0);
-            }
+            padding ??= new RectOffset(0, 0, 0, 0);
         }
 
         #region IScrollLayout 接口实现

@@ -279,6 +279,7 @@ namespace SimpleToolkits.Internal
                 itemSize2 = _cellSize;
             }
             cell.anchoredPosition = pos;
+            
             // 调整 sizeDelta，保证跨轴填充（可选）
             var size = cell.sizeDelta;
             if (_layout.IsVertical)
@@ -289,7 +290,8 @@ namespace SimpleToolkits.Internal
                 if (_layout.ControlChildWidth)
                 {
                     var contentWidth = Mathf.Max(0f, _contentSize.x - _layout.Padding.left - _layout.Padding.right);
-                    size.x = contentWidth;
+                    // 修复：确保宽度不小于原始尺寸，避免尺寸异常
+                    size.x = Mathf.Max(contentWidth, itemSize2.x);
                 }
                 else
                 {
@@ -304,13 +306,19 @@ namespace SimpleToolkits.Internal
                 if (_layout.ControlChildHeight)
                 {
                     var contentHeight = Mathf.Max(0f, _contentSize.y - _layout.Padding.top - _layout.Padding.bottom);
-                    size.y = contentHeight;
+                    // 修复：确保高度不小于原始尺寸，避免尺寸异常
+                    size.y = Mathf.Max(contentHeight, itemSize2.y);
                 }
                 else
                 {
                     size.y = itemSize2.y; // 使用 per-item/测量高度
                 }
             }
+            
+            // 修复：确保尺寸不会变成负值或过小值
+            size.x = Mathf.Max(size.x, 1f);
+            size.y = Mathf.Max(size.y, 1f);
+            
             cell.sizeDelta = size;
         }
 
@@ -486,12 +494,16 @@ namespace SimpleToolkits.Internal
             {
                 var mainSize = padMainStart + padMainEnd + mainSum + Mathf.Max(0, count - 1) * spacing;
                 var crossSize = _layout.ControlChildWidth ? _viewportSize.x : (_layout.Padding.left + _layout.Padding.right + crossMax);
+                // 修复：确保内容尺寸不小于最小值
+                crossSize = Mathf.Max(crossSize, crossMax + _layout.Padding.left + _layout.Padding.right);
                 _contentSize = new Vector2(crossSize, mainSize);
             }
             else
             {
                 var mainSize = padMainStart + padMainEnd + mainSum + Mathf.Max(0, count - 1) * spacing;
                 var crossSize = _layout.ControlChildHeight ? _viewportSize.y : (_layout.Padding.top + _layout.Padding.bottom + crossMax);
+                // 修复：确保内容尺寸不小于最小值
+                crossSize = Mathf.Max(crossSize, crossMax + _layout.Padding.top + _layout.Padding.bottom);
                 _contentSize = new Vector2(mainSize, crossSize);
             }
         }

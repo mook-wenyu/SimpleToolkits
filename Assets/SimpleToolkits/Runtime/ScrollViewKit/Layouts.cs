@@ -3,16 +3,16 @@ using UnityEngine;
 namespace SimpleToolkits
 {
     /// <summary>
-    /// 滚动布局的抽象基类，提供通用的布局功能和字段。
+    /// 纵向列表布局：从上到下，x 方向填充为 0。
     /// </summary>
-    public abstract class ScrollLayout : Component, IScrollLayout
+    public class VerticalLayout : Component, IScrollLayout
     {
         [Header("通用布局设置")]
         [Tooltip("内边距：左, 上, 右, 下")]
         public RectOffset padding = new RectOffset(0, 0, 0, 0);
         
         [Tooltip("是否控制子对象的宽度")]
-        public bool controlChildWidth = false;
+        public bool controlChildWidth = true;
         
         [Tooltip("是否控制子对象的高度")]
         public bool controlChildHeight = false;
@@ -20,50 +20,21 @@ namespace SimpleToolkits
         [Tooltip("是否反向排列")]
         public bool reverse = false;
 
-        #region IScrollLayout 接口实现
-        public abstract bool IsVertical { get; }
-        public abstract int ConstraintCount { get; }
-        
-        public bool ControlChildWidth => controlChildWidth;
-        public bool ControlChildHeight => controlChildHeight;
-        public bool Reverse => reverse;
-        
-        public abstract Vector2 Spacing { get; }
-        RectOffset IScrollLayout.Padding => padding;
-        #endregion
-
-        #region 抽象方法
-        public abstract void Setup(RectTransform viewport, RectTransform content);
-        public abstract Vector2 ComputeContentSize(int itemCount, Vector2 cellSize, Vector2 viewportSize);
-        public abstract void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last);
-        public abstract Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize);
-        #endregion
-    }
-
-    /// <summary>
-    /// 纵向列表布局：从上到下，x 方向填充为 0。
-    /// </summary>
-    public class VerticalLayout : ScrollLayout
-    {
         [Header("纵向布局设置")]
         [Tooltip("项目之间的垂直间距")]
         public float spacing = 4f;
 
-        // 构造函数设置默认值
-        public VerticalLayout()
-        {
-            controlChildWidth = true;
-            controlChildHeight = false;
-            reverse = false;
-        }
-
-        #region ScrollLayout 抽象属性实现
-        public override bool IsVertical => true;
-        public override int ConstraintCount => 1;
-        public override Vector2 Spacing => new Vector2(0, spacing);
+        #region IScrollLayout 接口实现
+        public bool IsVertical => true;
+        public int ConstraintCount => 1;
+        public Vector2 Spacing => new Vector2(0, spacing);
+        public bool ControlChildWidth => controlChildWidth;
+        public bool ControlChildHeight => controlChildHeight;
+        public bool Reverse => reverse;
+        RectOffset IScrollLayout.Padding => padding;
         #endregion
 
-        public override void Setup(RectTransform viewport, RectTransform content)
+        public void Setup(RectTransform viewport, RectTransform content)
         {
             // 顶部对齐
             content.anchorMin = new Vector2(0, 1);
@@ -72,7 +43,7 @@ namespace SimpleToolkits
             content.anchoredPosition = Vector2.zero;
         }
 
-        public override Vector2 ComputeContentSize(int itemCount, Vector2 cellSize, Vector2 viewportSize)
+        public Vector2 ComputeContentSize(int itemCount, Vector2 cellSize, Vector2 viewportSize)
         {
             float height = padding.top + padding.bottom;
             if (itemCount > 0)
@@ -84,7 +55,7 @@ namespace SimpleToolkits
             return new Vector2(width, height);
         }
 
-        public override void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last)
+        public void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last)
         {
             // normalized 1=顶部, 0=底部
             var contentHeight = ComputeContentSize(itemCount, cellSize, viewportSize).y;
@@ -121,7 +92,7 @@ namespace SimpleToolkits
             }
         }
 
-        public override Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize)
+        public Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize)
         {
             // 数学镜像：不依赖 contentSize，直接使用 itemCount
             int viewIndex = reverse ? Mathf.Max(0, itemCount - 1 - index) : index;
@@ -134,27 +105,36 @@ namespace SimpleToolkits
     /// <summary>
     /// 横向列表布局：从左到右，y 方向填充为 0。
     /// </summary>
-    public class HorizontalLayout : ScrollLayout
+    public class HorizontalLayout : Component, IScrollLayout
     {
+        [Header("通用布局设置")]
+        [Tooltip("内边距：左, 上, 右, 下")]
+        public RectOffset padding = new RectOffset(0, 0, 0, 0);
+        
+        [Tooltip("是否控制子对象的宽度")]
+        public bool controlChildWidth = false;
+        
+        [Tooltip("是否控制子对象的高度")]
+        public bool controlChildHeight = true;
+        
+        [Tooltip("是否反向排列")]
+        public bool reverse = false;
+
         [Header("横向布局设置")]
         [Tooltip("项目之间的水平间距")]
         public float spacing = 4f;
 
-        // 构造函数设置默认值
-        public HorizontalLayout()
-        {
-            controlChildWidth = false;
-            controlChildHeight = true;
-            reverse = false;
-        }
-
-        #region ScrollLayout 抽象属性实现
-        public override bool IsVertical => false;
-        public override int ConstraintCount => 1;
-        public override Vector2 Spacing => new Vector2(spacing, 0);
+        #region IScrollLayout 接口实现
+        public bool IsVertical => false;
+        public int ConstraintCount => 1;
+        public Vector2 Spacing => new Vector2(spacing, 0);
+        public bool ControlChildWidth => controlChildWidth;
+        public bool ControlChildHeight => controlChildHeight;
+        public bool Reverse => reverse;
+        RectOffset IScrollLayout.Padding => padding;
         #endregion
 
-        public override void Setup(RectTransform viewport, RectTransform content)
+        public void Setup(RectTransform viewport, RectTransform content)
         {
             // 左侧对齐
             content.anchorMin = new Vector2(0, 1);
@@ -163,7 +143,7 @@ namespace SimpleToolkits
             content.anchoredPosition = Vector2.zero;
         }
 
-        public override Vector2 ComputeContentSize(int itemCount, Vector2 cellSize, Vector2 viewportSize)
+        public Vector2 ComputeContentSize(int itemCount, Vector2 cellSize, Vector2 viewportSize)
         {
             float width = padding.left + padding.right;
             if (itemCount > 0)
@@ -174,7 +154,7 @@ namespace SimpleToolkits
             return new Vector2(width, height);
         }
 
-        public override void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last)
+        public void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last)
         {
             // horizontalNormalized 0=最左,1=最右
             var contentWidth = ComputeContentSize(itemCount, cellSize, viewportSize).x;
@@ -205,7 +185,7 @@ namespace SimpleToolkits
             }
         }
 
-        public override Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize)
+        public Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize)
         {
             int viewIndex = reverse ? Mathf.Max(0, itemCount - 1 - index) : index;
             var x = padding.left + viewIndex * (cellSize.x + spacing);
@@ -217,8 +197,21 @@ namespace SimpleToolkits
     /// <summary>
     /// 网格布局：按 ConstraintCount 进行换行/换列。IsVertical=true 表示纵向滚动（从上到下换行），false 表示横向滚动（从左到右换列）。
     /// </summary>
-    public class GridLayout : ScrollLayout
+    public class GridLayout : Component, IScrollLayout
     {
+        [Header("通用布局设置")]
+        [Tooltip("内边距：左, 上, 右, 下")]
+        public RectOffset padding = new RectOffset(0, 0, 0, 0);
+        
+        [Tooltip("是否控制子对象的宽度")]
+        public bool controlChildWidth = false;
+        
+        [Tooltip("是否控制子对象的高度")]
+        public bool controlChildHeight = false;
+        
+        [Tooltip("是否反向排列")]
+        public bool reverse = false;
+
         [Header("网格设置")]
         [Tooltip("是否为纵向滚动（true：从上到下换行，false：从左到右换列）")]
         public bool isVertical = true;
@@ -233,21 +226,17 @@ namespace SimpleToolkits
         [Tooltip("垂直间距")]
         public float spacingY = 4f;
 
-        // 构造函数设置默认值
-        public GridLayout()
-        {
-            controlChildWidth = false;
-            controlChildHeight = false;
-            reverse = false;
-        }
-
-        #region ScrollLayout 抽象属性实现
-        public override bool IsVertical => isVertical;
-        public override int ConstraintCount => Mathf.Max(1, constraintCount);
-        public override Vector2 Spacing => new Vector2(spacingX, spacingY);
+        #region IScrollLayout 接口实现
+        public bool IsVertical => isVertical;
+        public int ConstraintCount => Mathf.Max(1, constraintCount);
+        public Vector2 Spacing => new Vector2(spacingX, spacingY);
+        public bool ControlChildWidth => controlChildWidth;
+        public bool ControlChildHeight => controlChildHeight;
+        public bool Reverse => reverse;
+        RectOffset IScrollLayout.Padding => padding;
         #endregion
 
-        public override void Setup(RectTransform viewport, RectTransform content)
+        public void Setup(RectTransform viewport, RectTransform content)
         {
             if (IsVertical)
             {
@@ -264,7 +253,7 @@ namespace SimpleToolkits
             content.anchoredPosition = Vector2.zero;
         }
 
-        public override Vector2 ComputeContentSize(int itemCount, Vector2 cellSize, Vector2 viewportSize)
+        public Vector2 ComputeContentSize(int itemCount, Vector2 cellSize, Vector2 viewportSize)
         {
             if (isVertical)
             {
@@ -284,7 +273,7 @@ namespace SimpleToolkits
             }
         }
 
-        public override void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last)
+        public void GetVisibleRange(float normalizedPosition, int itemCount, Vector2 viewportSize, Vector2 cellSize, out int first, out int last)
         {
             if (itemCount <= 0)
             {
@@ -361,7 +350,7 @@ namespace SimpleToolkits
             }
         }
 
-        public override Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize)
+        public Vector2 GetItemAnchoredPosition(int index, int itemCount, Vector2 cellSize)
         {
             if (isVertical)
             {
@@ -385,5 +374,4 @@ namespace SimpleToolkits
             }
         }
     }
-
 }

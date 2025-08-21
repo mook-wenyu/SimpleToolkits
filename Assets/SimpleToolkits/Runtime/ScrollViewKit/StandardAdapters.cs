@@ -453,6 +453,25 @@ namespace SimpleToolkits
         {
             return (_sizeCache.Count, _maxCacheSize, (double)_sizeCache.Count / _maxCacheSize);
         }
+
+        /// <summary>
+        /// 测试性能
+        /// </summary>
+        public (double averageTimeMs, int testCount) TestPerformance(IScrollLayout layout, Vector2 viewportSize, int testCount = 1000)
+        {
+            var startTime = Time.realtimeSinceStartup;
+            
+            for (int i = 0; i < testCount; i++)
+            {
+                GetItemSize(i % 100, viewportSize, layout);
+            }
+            
+            var endTime = Time.realtimeSinceStartup;
+            var totalTime = endTime - startTime;
+            var averageTimeMs = (totalTime / testCount) * 1000;
+
+            return (averageTimeMs, testCount);
+        }
         #endregion
     }
 }

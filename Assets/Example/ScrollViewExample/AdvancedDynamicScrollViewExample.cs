@@ -439,9 +439,12 @@ namespace SimpleToolkits.ScrollViewExample
         [ContextMenu("显示诊断信息")]
         private void ShowDiagnostics()
         {
-            if (_sizeProvider != null && _messageTemplate != null)
+            if (_adapter != null && _messageTemplate != null)
             {
-                var diagnostics = _sizeProvider.GetDiagnostics(_messageTemplate);
+                var stats = _adapter.GetCacheStats();
+                var diagnostics = $"=== StandardVariableSizeAdapter 诊断信息 ===\n";
+                diagnostics += $"缓存统计: {stats.cacheCount}/{stats.maxCacheSize} ({stats.cacheUsage:P1})\n";
+                diagnostics += $"模板状态: 正常\n";
                 Debug.Log(diagnostics);
             }
         }
@@ -456,7 +459,7 @@ namespace SimpleToolkits.ScrollViewExample
 
                 if (layout != null && viewportSize != Vector2.zero)
                 {
-                    var result = _sizeProvider.TestPerformance(layout, viewportSize, 1000);
+                    var result = _adapter.TestPerformance(layout, viewportSize, 1000);
                     Debug.Log($"[AdvancedDynamicScrollViewExample] 性能测试: 平均{result.averageTimeMs:F4}ms/次 (测试{result.testCount}次)");
                 }
             }

@@ -37,7 +37,9 @@ Simple Toolkits is a comprehensive Unity game development framework that provide
 
 ### Kit Components
 - **AIKit**: Finite State Machine (FSM) and GOAP systems
+- **ActivityQueueKit**: Activity queue management for sequential task execution
 - **AudioKit**: Audio management and playback
+- **ConsoleKit**: In-game console system for debugging
 - **DataStorageKit**: Multi-backend data storage (PlayerPrefs, JSON files)
 - **ExcelKit**: Configuration management with Excel-to-JSON pipeline
 - **GameKit**: Core game management systems
@@ -45,7 +47,7 @@ Simple Toolkits is a comprehensive Unity game development framework that provide
 - **PathfindingKit**: A* pathfinding implementation
 - **PoolKit**: Object pooling for performance optimization
 - **ResKit**: Resource loading and management with YooAsset integration
-- **ScrollViewKit**: High-performance scroll view implementation with AutoSizeProvider system
+- **SceneKit**: Scene management utilities
 - **UIPanelKit**: UI panel management system
 - **WebKit**: Web request handling
 
@@ -121,100 +123,54 @@ public class MyService : ISingleton, SingletonCreator<MyService>
 - **Runtime Source**: `Assets/SimpleToolkits/Runtime/`
 - **Editor Tools**: `Assets/SimpleToolkits/Editor/`
 
-## ScrollViewKit 详细说明
+## UI Scroll View Implementation
 
-### 架构特点
+### LoopScrollRect Package
+项目使用第三方包 `me.qiankanglai.loopscrollrect` 来实现高性能的无限滚动列表。
 
-ScrollViewKit 是一个高性能的滚动视图系统，支持动态尺寸计算和虚拟化滚动。
-
-### 核心接口
-
-**统一的变尺寸适配器接口**：
-```csharp
-public interface IVariableSizeAdapter
-{
-    Vector2 GetItemSize(int index, Vector2 viewportSize, IScrollLayout layout);
-}
-```
-
-### StandardVariableSizeAdapter 系统
-
-- **StandardVariableSizeAdapter**: 增强的标准变尺寸适配器，合并了原 AutoSizeProvider 功能
-- **BaseVariableSizeAdapter**: 基础变尺寸适配器，提供核心功能和智能尺寸计算
-- **特点**: 高性能、智能布局感知、支持固定和自适应尺寸参数、适用于各种布局场景
-
-### 智能尺寸计算
-
-适配器根据 IScrollLayout 布局模式自动优化尺寸计算：
-
-- **纵向布局**：通常固定宽度，高度自适应
-- **横向布局**：通常固定高度，宽度自适应  
-- **网格布局**：支持固定宽高或按约束计算
+### 核心特性
+- **虚拟化滚动**: 仅渲染可见区域的项目，大幅提升性能
+- **无限滚动**: 支持无限长度的数据列表
+- **多方向支持**: 支持垂直和水平滚动
+- **多列/多行**: 支持网格布局的多列或多行显示
+- **动态尺寸**: 支持不同尺寸的列表项
 
 ### 使用模式
-
 ```csharp
-// 1. 纵向布局：固定宽度，自适应高度
-var adapter = StandardVariableSizeAdapter.CreateForVertical(
-    prefab: messageTemplate,
-    countGetter: () => messages.Count,
-    dataGetter: index => messages[index],
-    binder: messageBinder,
-    templateBinder: (rt, data) => {
-        // 绑定数据到模板
-    },
-    fixedWidth: 300f,
-    minHeight: 60f,
-    maxHeight: 300f
-);
-
-// 2. 横向布局：固定高度，自适应宽度
-var adapter = StandardVariableSizeAdapter.CreateForHorizontal(
-    prefab: messageTemplate,
-    countGetter: () => messages.Count,
-    dataGetter: index => messages[index],
-    binder: messageBinder,
-    templateBinder: (rt, data) => {
-        // 绑定数据到模板
-    },
-    fixedHeight: 300f,
-    minWidth: 100f,
-    maxWidth: 500f
-);
-
-// 3. 网格布局：固定宽高
-var adapter = StandardVariableSizeAdapter.CreateForGrid(
-    prefab: itemTemplate,
-    countGetter: () => items.Count,
-    dataGetter: index => items[index],
-    binder: itemBinder,
-    templateBinder: (rt, data) => {
-        // 绑定数据到模板
-    },
-    fixedWidth: 100f,
-    fixedHeight: 100f
-);
-
-// 4. 初始化 ScrollView
-scrollView.Initialize(adapter);
+// 垂直滚动列表
+public class VerticalScrollExample : MonoBehaviour, LoopScrollPrefabSource, LoopScrollDataSource
+{
+    public LoopVerticalScrollRect scrollRect;
+    public GameObject itemPrefab;
+    
+    void Start()
+    {
+        scrollRect.prefabSource = this;
+        scrollRect.dataSource = this;
+        scrollRect.totalCount = dataList.Count;
+        scrollRect.RefillCells();
+    }
+    
+    // 实现 LoopScrollPrefabSource 接口
+    public GameObject GetObject(int index)
+    {
+        return Instantiate(itemPrefab);
+    }
+    
+    public void ReturnObject(Transform trans)
+    {
+        Destroy(trans.gameObject);
+    }
+    
+    // 实现 LoopScrollDataSource 接口
+    public void ProvideData(Transform transform, int idx)
+    {
+        // 绑定数据到UI组件
+        var item = transform.GetComponent<ItemComponent>();
+        item.SetData(dataList[idx]);
+    }
+}
 ```
-
-### 参数说明
-
-- **fixedWidth/fixedHeight**: 固定尺寸（≤0 表示自适应，>0 表示固定）
-- **minWidth/minHeight**: 最小尺寸限制
-- **maxWidth/maxHeight**: 最大尺寸限制
-- **enableCache**: 是否启用尺寸缓存
-- **maxCacheSize**: 最大缓存数量
-
-### 性能优化
-
-- 智能尺寸计算，根据布局模式自动优化
-- 缓存机制避免重复计算
-- 支持预热缓存提高初始性能
-- 智能布局重建减少性能开销
-- 对象池管理提高内存效率
-- 支持自定义尺寸计算器
 
 ## Dependencies
 
@@ -222,6 +178,7 @@ scrollView.Initialize(adapter);
 - **YooAsset**: Asset management and bundling
 - **UniTask**: Async operations
 - **PrimeTween**: Animation system
+- **LoopScrollRect**: High-performance infinite scrolling lists
 - **NPOI**: Excel processing (via NuGet)
 - **Newtonsoft.Json**: JSON serialization
 - **TextMeshPro**: Text rendering

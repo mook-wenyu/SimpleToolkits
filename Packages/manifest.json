@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/UnityMcpBridge",
     "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
     "com.github-glitchenzo.nugetforunity": "4.5.0",
     "com.kyrylokuzyk.primetween": "file:../Assets/Plugins/PrimeTween/internal/com.kyrylokuzyk.primetween.tgz",
@@ -47,22 +46,26 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0"
+    "com.unity.modules.xr": "1.0.0",
+    "com.coplaydev.unity-mcp": "3.0.0",
+    "me.qiankanglai.loopscrollrect": "1.1.4"
   },
   "scopedRegistries": [
-    {
-      "name": "package.openupm.com",
-      "url": "https://package.openupm.com",
-      "scopes": [
-        "com.tuyoogame.yooasset",
-        "com.github-glitchenzo.nugetforunity"
-      ]
-    },
     {
       "name": "npm",
       "url": "https://registry.npmjs.org/",
       "scopes": [
         "com.kyrylokuzyk"
+      ]
+    },
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.coplaydev.unity-mcp",
+        "com.github-glitchenzo.nugetforunity",
+        "com.tuyoogame.yooasset",
+        "me.qiankanglai.loopscrollrect"
       ]
     }
   ]

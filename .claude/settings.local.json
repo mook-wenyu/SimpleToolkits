@@ -25,7 +25,13 @@
       "Bash(timeout:*)",
       "mcp__UnityMCP__execute_menu_item",
       "Bash(del *.cs)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(del \"D:\\UnityProjects\\SimpleToolkits\\Assets\\SimpleToolkits\\Runtime\\ScrollViewKit\\IScrollLayout.cs\")",
+      "Bash(mkdir:*)",
+      "Bash(del:*)",
+      "mcp__ide__getDiagnostics",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
     ],
     "deny": [],
     "ask": [],

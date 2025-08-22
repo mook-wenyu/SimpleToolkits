@@ -11,7 +11,8 @@
   "description": "Simple Toolkits",
   "keywords": [
     "gameplay",
-    "tools"
+    "tools",
+    "kits"
   ],
   "license": "Apache-2.0",
   "dependencies": {
